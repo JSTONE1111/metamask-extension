@@ -25,3 +25,129 @@ jobs:
         env:
           LABEL_TOKEN: ${{ secrets.LABEL_TOKEN }}
         run: npm run check-template-and-add-labels
+/* full code — copy into server/index.js */
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { createClient } from "redis";
+import jwt from "jsonwebtoken";
+import { verifyMessage } from "ethers";
+
+dotenv.config();
+
+const app = express();
+app.use(express.json());
+app.use(helmet());
+
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN;
+if (!FRONTEND_ORIGIN) throw new Error("FRONTEND_ORIGIN required");
+app.use(cors({ origin: FRONTEND_ORIGIN, methods: ["GET","POST"], credentials: true }));
+
+const limiter = rateLimit({
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 60000),
+  max: Number(process.env.RATE_LIMIT_MAX || 120),
+});
+app.use(limiter);
+
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+const redis = createClient({ url: redisUrl });
+redis.on("error", (err)=>console.error("Redis error", err));
+await redis.connect();
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+const NONCE_TTL_SECONDS = Number(process.env.NONCE_TTL_SECONDS || 300);
+const EXPECTED_CHAIN_ID = String(process.env.SIWE_CHAIN_ID || "1");
+
+function generateNonce(){
+  return Math.random().toString(36).slice(2,12); // 10 chars
+}
+
+async function storeNonce(address, nonce){
+  const key = `siwe:nonce:${address.toLowerCase()}`;
+  const ok = await redis.set(key, nonce, { NX: true, EX: NONCE_TTL_SECONDS });
+  return ok === "OK";
+}
+
+async function consumeNonce(address, expectedNonce){
+  const key = `siwe:nonce:${address.toLowerCase()}`;
+  const script = `
+    local v = redis.call('GET', KEYS[1])
+    if not v then return nil end
+    if v ~= ARGV[1] then return false end
+    redis.call('DEL', KEYS[1])
+    return true
+  `;
+  const res = await redis.eval(script, { keys:[key], arguments:[expectedNonce] });
+  return res === 1;
+}
+
+app.get("/api/nonce", limiter, async (req,res) => {
+  try {
+    const { address } = req.query;
+    if(!address) return res.status(400).json({ error:"address required" });
+    const nonce = generateNonce();
+    const ok = await storeNonce(address, nonce);
+    if(!ok) return res.status(409).json({ error:"nonce already issued; retry" });
+    return res.json({ nonce, ttl: NONCE_TTL_SECONDS });
+  } catch(e){
+    console.error(e);
+    return res.status(500).json({ error:e.message });
+  }
+});
+
+app.post("/api/verify", limiter, async (req,res) => {
+  try {
+    const { message, signature } = req.body;
+    if(!message || !signature) return res.status(400).json({ error:"message & signature required" });
+
+    let recovered;
+    try { recovered = verifyMessage(message, signature); }
+    catch(e){ return res.status(400).json({ error:"invalid signature" }); }
+
+    // parse nonce (EIP-4361 contains a `Nonce: <nonce>` line)
+    const nonceMatch = message.match(/Nonce:\s*([a-zA-Z0-9_-]{8,})/);
+    if(!nonceMatch) return res.status(400).json({ error:"nonce missing from message" });
+    const nonce = nonceMatch[1];
+
+    const address = recovered.toLowerCase();
+
+    // atomically consume nonce
+    const consumed = await consumeNonce(address, nonce);
+    if(!consumed) return res.status(400).json({ error:"nonce invalid or already used" });
+
+    // optional chain check
+    const chainMatch = message.match(/Chain ID:\s*(\d+)/);
+    if(chainMatch && chainMatch[1] !== EXPECTED_CHAIN_ID) return res.status(400).json({ error:"unexpected chainId" });
+
+    // optional expiration check
+    const expMatch = message.match(/Expiration Time:\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)/);
+    if(expMatch){
+      const exp = new Date(expMatch[1]).getTime();
+      if(Date.now() > exp) return res.status(400).json({ error:"message expired" });
+    }
+
+    const token = jwt.sign({ address }, JWT_SECRET, { expiresIn: Number(process.env.JWT_EXPIRES_IN || 3600) });
+    return res.json({ success:true, token });
+  } catch(e){
+    console.error(e);
+    return res.status(500).json({ error:e.message });
+  }
+});
+
+app.get("/api/me", async (req,res) => {
+  const auth = req.headers.authorization || "";
+  const m = auth.match(/^Bearer (.+)$/);
+  if(!m) return res.status(401).json({ error:"missing token" });
+  const token = m[1];
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return res.json({ success:true, payload });
+  } catch(e) {
+    return res.status(401).json({ error:"invalid token" });
+  }
+});
+
+const PORT = Number(process.env.PORT || 3001);
+app.listen(PORT, ()=>console.log(`Server listening on ${PORT}`));
