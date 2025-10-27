@@ -1,7 +1,7 @@
 name: Remove RCA-needed Label
 
 on:
-  # Run every 6 hours
+  # Run every 12 hours
   schedule:
     - cron: '0 */6 * * *'
 
