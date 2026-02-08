@@ -1,6 +1,6 @@
 import React from 'react';
 import configureMockStore from 'redux-mock-store';
-import { renderWithProvider } from '../../../../test/jest';
+import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import {
   STATUS_CONNECTED,
   STATUS_CONNECTED_TO_ANOTHER_ACCOUNT,
@@ -142,8 +142,31 @@ describe('Connected Site Menu', () => {
           },
         },
       },
-      domains: {},
+      domains: {
+        'https://uniswap.org/': 'mainnet-infura',
+      },
       networkConfigurationsByChainId: defaultNetworkConfigurations,
+      selectedNetworkClientId: 'mainnet-infura',
+      keyrings: [
+        {
+          type: 'HD Key Tree',
+          accounts: [mockAccount1.address, mockAccount2.address],
+          metadata: {
+            id: 'test-keyring-id',
+          },
+        },
+      ],
+      // Add multichain network state
+      selectedMultichainNetworkChainId: 'eip155:1',
+      isEvmSelected: true,
+      // Add permission history for the selector
+      permissionHistory: {
+        'https://uniswap.org/': {
+          eth_accounts: {
+            accounts: [`eip155:1:${mockAccount1.address}`],
+          },
+        },
+      },
       ...customState.metamask,
     };
 

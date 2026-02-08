@@ -15,6 +15,12 @@ import {
 } from './turn-on-backup-and-sync-modal';
 
 const mockTrackEvent = jest.fn();
+const mockMetaMetricsContext = {
+  trackEvent: mockTrackEvent,
+  bufferedTrace: jest.fn(),
+  bufferedEndTrace: jest.fn(),
+  onboardingParentContext: { current: null },
+};
 
 jest.mock('../../../../../hooks/useModalProps', () => ({
   useModalProps: jest.fn(),
@@ -26,12 +32,13 @@ jest.mock('react-redux', () => ({
   useDispatch: () => mockDispatch,
 }));
 
-const mockHistoryPush = jest.fn();
-jest.mock('react-router-dom', () => ({
-  useHistory: () => ({
-    push: mockHistoryPush,
-  }),
-}));
+const mockUseNavigate = jest.fn();
+jest.mock('react-router-dom', () => {
+  return {
+    ...jest.requireActual('react-router-dom'),
+    useNavigate: () => mockUseNavigate,
+  };
+});
 
 const mockSetIsBackupAndSyncFeatureEnabled = jest.fn();
 jest.mock('../../../../../hooks/identity/useBackupAndSync', () => ({
@@ -87,7 +94,7 @@ describe('TurnOnBackupAndSyncModal', () => {
   it('sends a MetaMetrics event when the modal is dismissed', () => {
     const { getByLabelText } = render(
       <Redux.Provider store={mockStore(initialStore())}>
-        <MetaMetricsContext.Provider value={mockTrackEvent}>
+        <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
           <MetamaskIdentityProvider>
             <TurnOnBackupAndSyncModal />
           </MetamaskIdentityProvider>
@@ -151,7 +158,7 @@ describe('TurnOnBackupAndSyncModal', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(mockHistoryPush).toHaveBeenCalledWith(BACKUPANDSYNC_ROUTE);
+      expect(mockUseNavigate).toHaveBeenCalledWith(BACKUPANDSYNC_ROUTE);
       expect(mockSetIsBackupAndSyncFeatureEnabled).toHaveBeenCalledWith(
         BACKUPANDSYNC_FEATURES.main,
         true,
@@ -163,7 +170,7 @@ describe('TurnOnBackupAndSyncModal', () => {
   it('sends a MetaMetrics event when the button is clicked', async () => {
     const { getByTestId } = render(
       <Redux.Provider store={mockStore(initialStore())}>
-        <MetaMetricsContext.Provider value={mockTrackEvent}>
+        <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
           <MetamaskIdentityProvider>
             <TurnOnBackupAndSyncModal />
           </MetamaskIdentityProvider>

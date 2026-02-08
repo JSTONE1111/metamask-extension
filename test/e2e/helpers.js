@@ -8,32 +8,14 @@ const WebSocket = require('ws');
 const createStaticServer = require('../../development/create-static-server');
 const { setupMocking } = require('./mock-e2e');
 const { setupMockingPassThrough } = require('./mock-e2e-pass-through');
-const { Anvil } = require('./seeder/anvil');
-const { Ganache } = require('./seeder/ganache');
-const FixtureServer = require('./fixture-server');
+const FixtureServer = require('./fixtures/fixture-server');
 const PhishingWarningPageServer = require('./phishing-warning-page-server');
 const { buildWebDriver } = require('./webdriver');
 const { PAGES } = require('./webdriver/driver');
-const AnvilSeeder = require('./seeder/anvil-seeder');
-const GanacheSeeder = require('./seeder/ganache-seeder');
 const { Bundler } = require('./bundler');
 const { SMART_CONTRACTS } = require('./seeder/smart-contracts');
 const { setManifestFlags } = require('./set-manifest-flags');
-const {
-  ERC_4337_ACCOUNT,
-  DAPP_HOST_ADDRESS,
-  DAPP_URL,
-  DAPP_ONE_URL,
-  DAPP_TWO_URL,
-  TEST_SEED_PHRASE,
-  TEST_SEED_PHRASE_TWO,
-  PRIVATE_KEY,
-  PRIVATE_KEY_TWO,
-  ACCOUNT_1,
-  ACCOUNT_2,
-  WALLET_PASSWORD,
-  WINDOW_TITLES,
-} = require('./constants');
+const { DAPP_PATHS, ERC_4337_ACCOUNT } = require('./constants');
 const {
   getServerMochaToBackground,
 } = require('./background-socket/server-mocha-to-background');
@@ -149,7 +131,6 @@ function normalizeSmartContracts(smartContract) {
  */
 async function withFixtures(options, testSuite) {
   const {
-    dapp,
     fixtures,
     localNodeOptions = 'anvil',
     smartContract,
@@ -158,9 +139,7 @@ async function withFixtures(options, testSuite) {
     staticServerOptions,
     title,
     ignoredConsoleErrors = [],
-    dappPath = undefined,
     disableServerMochaToBackground = false,
-    dappPaths,
     testSpecificMock = function () {
       // do nothing.
     },
@@ -171,6 +150,7 @@ async function withFixtures(options, testSuite) {
     monConversionInUsd,
     manifestFlags,
     solanaWebSocketSpecificMocks = [],
+    extendedTimeoutMultiplier = 1,
   } = options;
 
   // Normalize localNodeOptions
@@ -181,7 +161,17 @@ async function withFixtures(options, testSuite) {
   const bundlerServer = new Bundler();
   const https = await mockttp.generateCACertificate();
   const mockServer = mockttp.getLocal({ https, cors: true });
-  let numberOfDapps = dapp ? 1 : 0;
+  const dappOpts = dappOptions || {};
+  const hasCustomPaths =
+    Array.isArray(dappOpts.customDappPaths) &&
+    dappOpts.customDappPaths.length > 0;
+  const customCount = hasCustomPaths ? dappOpts.customDappPaths.length : 0;
+  const defaultCount =
+    typeof dappOpts.numberOfTestDapps === 'number' &&
+    dappOpts.numberOfTestDapps > 0
+      ? dappOpts.numberOfTestDapps
+      : 0;
+  const numberOfDapps = customCount + defaultCount;
   const dappServer = [];
   const phishingPageServer = new PhishingWarningPageServer();
 
@@ -207,12 +197,16 @@ async function withFixtures(options, testSuite) {
 
       switch (nodeType) {
         case 'anvil':
+          // eslint-disable-next-line node/global-require, no-case-declarations -- load this module conditionally
+          const { Anvil } = require('./seeder/anvil');
           localNode = new Anvil();
           await localNode.start(nodeOptions);
           localNodes.push(localNode);
           break;
 
         case 'ganache':
+          // eslint-disable-next-line node/global-require, no-case-declarations -- load this module conditionally
+          const { Ganache } = require('./seeder/ganache');
           localNode = new Ganache();
           await localNode.start(nodeOptions);
           localNodes.push(localNode);
@@ -237,10 +231,14 @@ async function withFixtures(options, testSuite) {
     if (smartContract) {
       switch (localNodeOptsNormalized[0].type) {
         case 'anvil':
+          // eslint-disable-next-line node/global-require, no-case-declarations -- load this module conditionally
+          const AnvilSeeder = require('./seeder/anvil-seeder');
           seeder = new AnvilSeeder(localNodes[0].getProvider());
           break;
 
         case 'ganache':
+          // eslint-disable-next-line node/global-require, no-case-declarations -- load this module conditionally
+          const GanacheSeeder = require('./seeder/ganache-seeder');
           seeder = new GanacheSeeder(localNodes[0].getProvider());
           break;
 
@@ -276,29 +274,38 @@ async function withFixtures(options, testSuite) {
     }
 
     await phishingPageServer.start();
-    if (dapp) {
-      if (dappOptions?.numberOfDapps) {
-        numberOfDapps = dappOptions.numberOfDapps;
-      }
+    if (numberOfDapps > 0) {
+      // Ensure the default test dapp occupies the lowest ports first (e.g., 8080),
+      // then any custom dapps follow (e.g., 8081, 8082, ...).
       for (let i = 0; i < numberOfDapps; i++) {
         let dappDirectory;
-        if (dappPath || (dappPaths && dappPaths[i])) {
-          dappDirectory = path.resolve(__dirname, dappPath || dappPaths[i]);
+        let currentDappPath;
+        if (i < defaultCount) {
+          // First spin up the default test-dapp instances
+          currentDappPath = 'test-dapp';
+        } else if (hasCustomPaths) {
+          // Then start custom dapps on subsequent ports
+          currentDappPath = dappOpts.customDappPaths[i - defaultCount];
         } else {
+          currentDappPath = 'test-dapp';
+        }
+
+        if (DAPP_PATHS && DAPP_PATHS[currentDappPath]) {
           dappDirectory = path.resolve(
             __dirname,
-            '..',
-            '..',
-            'node_modules',
-            '@metamask',
-            'test-dapp',
-            'dist',
+            ...DAPP_PATHS[currentDappPath],
           );
+        } else {
+          dappDirectory = path.resolve(__dirname, currentDappPath);
         }
         dappServer.push(
           createStaticServer({ public: dappDirectory, ...staticServerOptions }),
         );
-        dappServer[i].listen(`${dappBasePort + i}`);
+        const basePort =
+          typeof dappOpts.basePort === 'number'
+            ? dappOpts.basePort
+            : dappBasePort;
+        dappServer[i].listen(`${basePort + i}`);
         await new Promise((resolve, reject) => {
           dappServer[i].on('listening', resolve);
           dappServer[i].on('error', reject);
@@ -317,15 +324,16 @@ async function withFixtures(options, testSuite) {
       : setupMocking;
 
     // Use the mockingSetupFunction we just chose
-    const { mockedEndpoint, getPrivacyReport } = await mockingSetupFunction(
-      mockServer,
-      testSpecificMock,
-      {
-        chainId: localNodeOptsNormalized[0]?.options.chainId || 1337,
-        ethConversionInUsd,
-        monConversionInUsd,
-      },
-    );
+    const {
+      mockedEndpoint,
+      getPrivacyReport,
+      getNetworkReport,
+      clearNetworkReport,
+    } = await mockingSetupFunction(mockServer, testSpecificMock, {
+      chainId: localNodeOptsNormalized[0]?.options.chainId || 1337,
+      ethConversionInUsd,
+      monConversionInUsd,
+    });
 
     if ((await detectPort(8000)) !== 8000) {
       throw new Error(
@@ -333,14 +341,18 @@ async function withFixtures(options, testSuite) {
       );
     }
     await mockServer.start(8000);
-
     await setManifestFlags(manifestFlags);
 
     const wd = await buildWebDriver({
       ...driverOptions,
       disableServerMochaToBackground,
     });
+
     driver = wd.driver;
+    driver.timeout =
+      extendedTimeoutMultiplier > 1
+        ? driver.timeout * extendedTimeoutMultiplier
+        : driver.timeout;
     extensionId = wd.extensionId;
     webDriver = driver.driver;
 
@@ -379,6 +391,8 @@ async function withFixtures(options, testSuite) {
       mockedEndpoint,
       mockServer,
       extensionId,
+      getNetworkReport,
+      clearNetworkReport,
     });
 
     const errorsAndExceptions = driver.summarizeErrorsAndExceptions();
@@ -411,7 +425,7 @@ async function withFixtures(options, testSuite) {
       if (process.env.UPDATE_PRIVACY_SNAPSHOT === 'true') {
         writeFileSync(
           './privacy-snapshot.json',
-          JSON.stringify(mergedReport, null, 2),
+          `${JSON.stringify(mergedReport, null, 2)}\n`, // must add trailing newline to satisfy prettier
         );
       } else {
         throw new Error(
@@ -467,7 +481,7 @@ async function withFixtures(options, testSuite) {
       if (webDriver) {
         shutdownTasks.push(driver.quit());
       }
-      if (dapp) {
+      if (numberOfDapps > 0) {
         for (let i = 0; i < numberOfDapps; i++) {
           if (dappServer[i] && dappServer[i].listening) {
             shutdownTasks.push(
@@ -532,62 +546,6 @@ async function withFixtures(options, testSuite) {
         );
       }
     }
-  }
-}
-
-const openDapp = async (driver, contract = null, dappURL = DAPP_URL) => {
-  return contract
-    ? await driver.openNewPage(`${dappURL}/?contract=${contract}`)
-    : await driver.openNewPage(dappURL);
-};
-
-const switchToOrOpenDapp = async (
-  driver,
-  contract = null,
-  dappURL = DAPP_URL,
-) => {
-  const handle = await driver.windowHandles.switchToWindowIfKnown(
-    WINDOW_TITLES.TestDApp,
-  );
-
-  if (!handle) {
-    await openDapp(driver, contract, dappURL);
-  }
-};
-
-const clickNestedButton = async (driver, tabName) => {
-  try {
-    await driver.clickElement({ text: tabName, tag: 'button' });
-  } catch (error) {
-    await driver.clickElement({
-      xpath: `//*[contains(text(),"${tabName}")]/parent::button`,
-    });
-  }
-};
-
-/**
- * Unlocks the wallet using the provided password.
- * This method is intended to replace driver.navigate and should not be called after driver.navigate.
- *
- * @param {WebDriver} driver - The webdriver instance
- * @param {object} [options] - Options for unlocking the wallet
- * @param {boolean} [options.navigate] - Whether to navigate to the root page prior to unlocking - defaults to true
- * @param {boolean} [options.waitLoginSuccess] - Whether to wait for the login to succeed - defaults to true
- * @param {string} [options.password] - Password to unlock wallet - defaults to shared WALLET_PASSWORD
- */
-async function unlockWallet(
-  driver,
-  { navigate = true, waitLoginSuccess = true, password = WALLET_PASSWORD } = {},
-) {
-  if (navigate) {
-    await driver.navigate();
-  }
-
-  await driver.waitForSelector('#password', { state: 'enabled' });
-  await driver.fill('#password', password);
-  await driver.press('#password', driver.Key.ENTER);
-  if (waitLoginSuccess) {
-    await driver.assertElementNotPresent('[data-testid="unlock-page"]');
   }
 }
 
@@ -732,10 +690,18 @@ async function initBundler(
 ) {
   try {
     const nodeType = localNodeOptsNormalized[0].type;
-    const seeder =
-      nodeType === 'ganache'
-        ? new GanacheSeeder(localNodeServer.getProvider())
-        : new AnvilSeeder(localNodeServer.getProvider());
+
+    let seeder;
+
+    if (nodeType === 'ganache') {
+      // eslint-disable-next-line node/global-require -- load this module conditionally
+      const GanacheSeeder = require('./seeder/ganache-seeder');
+      seeder = new GanacheSeeder(localNodeServer.getProvider());
+    } else {
+      // eslint-disable-next-line node/global-require -- load this module conditionally
+      const AnvilSeeder = require('./seeder/anvil-seeder');
+      seeder = new AnvilSeeder(localNodeServer.getProvider());
+    }
 
     await seeder.deploySmartContract(SMART_CONTRACTS.ENTRYPOINT);
 
@@ -758,36 +724,92 @@ async function initBundler(
 
 const sentryRegEx = /^https:\/\/sentry\.io\/api\/\d+\/envelope/gu;
 
+/**
+ * Check if sidepanel is enabled by examining the build flag at runtime.
+ * Only works on Chrome-based browsers (Firefox doesn't support sidepanel).
+ * Use this check for now in case we need to disable sidepanel in future.
+ *
+ * @returns {Promise<boolean>} True if sidepanel permission is present in manifest
+ */
+async function isSidePanelEnabled() {
+  try {
+    // Check if browser is Chrome (sidepanel is only supported in Chrome)
+    const hasSidepanel = process.env.SELENIUM_BROWSER === 'chrome';
+
+    // Log for debugging
+    console.log(`Sidepanel check: ${hasSidepanel ? 'enabled' : 'disabled'}`);
+
+    return hasSidepanel;
+  } catch (error) {
+    // Chrome API not accessible (e.g., LavaMoat scuttling mode, Firefox)
+    console.log('Sidepanel check failed:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Check if a key should be ignored based on various rules
+ *
+ * @param {string} key - The key to check
+ * @param {string[]} ignoredKeys - Array of keys/prefixes to ignore
+ * @returns {boolean} True if the key should be ignored
+ */
+const shouldIgnoreKey = (key, ignoredKeys) => {
+  const hasNonZeroArrayIndex = key.split('.').some((part) => {
+    const matches = part.match(/\[(\d+)\]/gu);
+    return (
+      matches?.some((match) => {
+        const index = Number(match.slice(1, -1));
+        return Number.isNaN(index) === false && index !== 0;
+      }) ?? false
+    );
+  });
+  if (hasNonZeroArrayIndex) {
+    return true;
+  }
+
+  // Ignore entropy keys in account tree (dynamic entropy IDs)
+  if (key.match(/entropy:[A-Z0-9]+/u)) {
+    return true;
+  }
+
+  // Check if any part of the key path should be ignored
+  const keyParts = key.split('.');
+  const shouldIgnore = ignoredKeys.some((ignoredKey) => {
+    const ignoredParts = ignoredKey.split('.');
+
+    // Ignore if the ignored key is an exact prefix of the current key
+    // OR if the current key exactly matches the ignored key
+    // OR if the current key starts with the ignored key (for nested properties)
+    const isExactPrefix = ignoredParts.every(
+      (part, index) => keyParts[index] === part,
+    );
+    const isExactMatch = key === ignoredKey;
+    const startsWithIgnoredKey =
+      key.startsWith(`${ignoredKey}.`) || key.startsWith(`${ignoredKey}[`);
+
+    return isExactPrefix || isExactMatch || startsWithIgnoredKey;
+  });
+
+  return shouldIgnore;
+};
+
 module.exports = {
-  DAPP_HOST_ADDRESS,
-  DAPP_URL,
-  DAPP_ONE_URL,
-  DAPP_TWO_URL,
-  TEST_SEED_PHRASE,
-  TEST_SEED_PHRASE_TWO,
-  PRIVATE_KEY,
-  PRIVATE_KEY_TWO,
-  ACCOUNT_1,
-  ACCOUNT_2,
+  assertInAnyOrder,
+  convertETHToHexGwei,
   convertToHexValue,
-  tinyDelayMs,
-  regularDelayMs,
+  createDownloadFolder,
+  createWebSocketConnection,
+  generateRandNumBetween,
+  getCleanAppState,
+  getEventPayloads,
+  isSidePanelEnabled,
   largeDelayMs,
+  regularDelayMs,
+  roundToXDecimalPlaces,
+  sentryRegEx,
+  shouldIgnoreKey,
+  tinyDelayMs,
   veryLargeDelayMs,
   withFixtures,
-  createDownloadFolder,
-  openDapp,
-  switchToOrOpenDapp,
-  unlockWallet,
-  WALLET_PASSWORD,
-  WINDOW_TITLES,
-  convertETHToHexGwei,
-  roundToXDecimalPlaces,
-  generateRandNumBetween,
-  getEventPayloads,
-  assertInAnyOrder,
-  getCleanAppState,
-  clickNestedButton,
-  sentryRegEx,
-  createWebSocketConnection,
 };

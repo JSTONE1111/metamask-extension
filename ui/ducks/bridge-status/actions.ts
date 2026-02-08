@@ -1,5 +1,9 @@
-import { QuoteMetadata, QuoteResponse } from '@metamask/bridge-controller';
-import { BridgeStatusAction } from '@metamask/bridge-status-controller';
+import {
+  type QuoteMetadata,
+  type QuoteResponse,
+  UnifiedSwapBridgeEventName,
+  type RequiredEventContextFromClient,
+} from '@metamask/bridge-controller';
 import { forceUpdateMetamaskState } from '../../store/actions';
 import { submitRequestToBackground } from '../../store/background-connection';
 import { MetaMaskReduxDispatch } from '../../store/store';
@@ -7,12 +11,13 @@ import { MetaMaskReduxDispatch } from '../../store/store';
 // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const callBridgeStatusControllerMethod = <T extends unknown[]>(
-  bridgeAction: BridgeStatusAction,
+  bridgeAction: 'submitTx',
   args?: T,
 ) => {
   return async (dispatch: MetaMaskReduxDispatch) => {
-    await submitRequestToBackground(bridgeAction, args);
+    const result = await submitRequestToBackground(bridgeAction, args);
     await forceUpdateMetamaskState(dispatch);
+    return result;
   };
 };
 
@@ -22,22 +27,25 @@ const callBridgeStatusControllerMethod = <T extends unknown[]>(
  * @param accountAddress
  * @param quote
  * @param isStxSupportedInClient
+ * @param context
  * @returns
  */
 export const submitBridgeTx = (
   accountAddress: string,
   quote: QuoteResponse & QuoteMetadata,
   isStxSupportedInClient: boolean,
+  context: RequiredEventContextFromClient[UnifiedSwapBridgeEventName.QuotesReceived],
 ) => {
   return async (dispatch: MetaMaskReduxDispatch) => {
     return dispatch(
       callBridgeStatusControllerMethod<
-        [string, QuoteResponse & QuoteMetadata, boolean]
-      >(BridgeStatusAction.SUBMIT_TX, [
-        accountAddress,
-        quote,
-        isStxSupportedInClient,
-      ]),
+        [
+          string,
+          QuoteResponse & QuoteMetadata,
+          boolean,
+          RequiredEventContextFromClient[UnifiedSwapBridgeEventName.QuotesReceived],
+        ]
+      >('submitTx', [accountAddress, quote, isStxSupportedInClient, context]),
     );
   };
 };

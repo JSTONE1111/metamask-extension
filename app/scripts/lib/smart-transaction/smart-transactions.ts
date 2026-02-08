@@ -5,16 +5,16 @@ import {
   StartFlow,
   UpdateRequestState,
 } from '@metamask/approval-controller';
-import { RestrictedMessenger } from '@metamask/base-controller';
-import SmartTransactionsController, {
-  SmartTransactionsControllerSmartTransactionEvent,
-} from '@metamask/smart-transactions-controller';
 import {
-  Fee,
-  Fees,
-  SmartTransaction,
+  SmartTransactionsController,
+  SmartTransactionsControllerSmartTransactionEvent,
   SmartTransactionStatuses,
-} from '@metamask/smart-transactions-controller/dist/types';
+  type Fee,
+  type Fees,
+  type SmartTransaction,
+  type SmartTransactionsNetworkConfig,
+  type SignedTransactionWithMetadata,
+} from '@metamask/smart-transactions-controller';
 import {
   TransactionController,
   TransactionMeta,
@@ -24,7 +24,7 @@ import {
 } from '@metamask/transaction-controller';
 import type { Hex } from '@metamask/utils';
 import log from 'loglevel';
-
+import { Messenger } from '@metamask/messenger';
 import {
   ORIGIN_METAMASK,
   SMART_TRANSACTION_CONFIRMATION_TYPES,
@@ -32,16 +32,15 @@ import {
 import { CANCEL_GAS_LIMIT_DEC } from '../../../../shared/constants/smartTransactions';
 import { decimalToHex } from '../../../../shared/modules/conversion.utils';
 import {
-  getFeatureFlagsByChainId,
   getIsSmartTransaction,
   isHardwareWallet,
+  getSmartTransactionsFeatureFlagsForChain,
 } from '../../../../shared/modules/selectors';
+import { getCurrentChainId } from '../../../../shared/modules/selectors/networks';
 import { isLegacyTransaction } from '../../../../shared/modules/transaction.utils';
 import { ControllerFlatState } from '../../controller-init/controller-list';
-import { TransactionControllerInitMessenger } from '../../controller-init/messengers/transaction-controller-messenger';
-import { Delegation7702PublishHook } from '../transaction/hooks/delegation-7702-publish';
-import { isSendBundleSupported } from '../transaction/sentinel-api';
 import { getTransactionById } from '../transaction/util';
+import { getClientForTransactionMetadata, sanitizeOrigin } from './utils';
 
 const namespace = 'SmartTransactions';
 
@@ -53,23 +52,13 @@ export type AllowedActions =
   | EndFlow;
 export type AllowedEvents = SmartTransactionsControllerSmartTransactionEvent;
 
-export type SmartTransactionHookMessenger = RestrictedMessenger<
+export type SmartTransactionHookMessenger = Messenger<
   typeof namespace,
   AllowedActions,
-  AllowedEvents,
-  AllowedActions['type'],
-  AllowedEvents['type']
+  AllowedEvents
 >;
 
-export type FeatureFlags = {
-  extensionActive: boolean;
-  mobileActive: boolean;
-  smartTransactions: {
-    expectedDeadline?: number;
-    maxDeadline?: number;
-    extensionReturnTxHashAsap?: boolean;
-  };
-};
+export type FeatureFlags = SmartTransactionsNetworkConfig;
 
 export type SubmitSmartTransactionRequest = {
   transactionMeta: TransactionMeta;
@@ -94,15 +83,7 @@ class SmartTransactionHook {
 
   #controllerMessenger: SmartTransactionHookMessenger;
 
-  #featureFlags: {
-    extensionActive: boolean;
-    mobileActive: boolean;
-    smartTransactions: {
-      expectedDeadline?: number;
-      maxDeadline?: number;
-      extensionReturnTxHashAsap?: boolean;
-    };
-  };
+  #featureFlags: FeatureFlags;
 
   #isDapp: boolean;
 
@@ -146,9 +127,21 @@ class SmartTransactionHook {
     this.#chainId = transactionMeta.chainId;
     this.#txParams = transactionMeta.txParams;
     this.#transactions = transactions;
-    this.#shouldShowStatusPage = Boolean(
-      transactionMeta.type !== TransactionType.bridge ||
-        (this.#transactions && this.#transactions.length > 0),
+    const extensionSkipSmartTransactionStatusPage =
+      featureFlags?.extensionSkipSmartTransactionStatusPage;
+
+    this.#shouldShowStatusPage = extensionSkipSmartTransactionStatusPage
+      ? false
+      : Boolean(
+          (transactionMeta.type !== TransactionType.bridge &&
+            transactionMeta.type !==
+              TransactionType.shieldSubscriptionApprove) ||
+            (this.#transactions && this.#transactions.length > 0),
+        );
+
+    log.info(
+      '[SmartTransaction] shouldShowStatusPage:',
+      this.#shouldShowStatusPage,
     );
   }
 
@@ -175,20 +168,27 @@ class SmartTransactionHook {
     if (this.#shouldShowStatusPage) {
       await this.#startApprovalFlow();
     }
+
     let getFeesResponse;
-    try {
-      getFeesResponse = await this.#smartTransactionsController.getFees(
-        { ...this.#txParams, chainId: this.#chainId },
-        undefined,
-        { networkClientId: this.#transactionMeta.networkClientId },
-      );
-    } catch (error) {
-      log.error(
-        'Error in smart transaction publish hook, falling back to regular transaction submission',
-        error,
-      );
-      this.#onApproveOrReject();
-      return useRegularTransactionSubmit; // Fallback to regular transaction submission.
+    // Skip getting fees if the tx is signed and sponsored
+    if (
+      !this.#signedTransactionInHex ||
+      !this.#transactionMeta.isGasFeeSponsored
+    ) {
+      try {
+        getFeesResponse = await this.#smartTransactionsController.getFees(
+          { ...this.#txParams, chainId: this.#chainId },
+          undefined,
+          { networkClientId: this.#transactionMeta.networkClientId },
+        );
+      } catch (error) {
+        log.error(
+          'Error in smart transaction publish hook, falling back to regular transaction submission',
+          error,
+        );
+        this.#onApproveOrReject();
+        return useRegularTransactionSubmit; // Fallback to regular transaction submission.
+      }
     }
     try {
       const submitTransactionResponse = await this.#signAndSubmitTransactions({
@@ -203,7 +203,7 @@ class SmartTransactionHook {
       await this.#processApprovalIfNeeded(uuid);
 
       const extensionReturnTxHashAsap =
-        this.#featureFlags?.smartTransactions?.extensionReturnTxHashAsap;
+        this.#featureFlags?.extensionReturnTxHashAsap;
 
       let transactionHash: string | undefined | null;
       if (extensionReturnTxHashAsap && submitTransactionResponse?.txHash) {
@@ -249,16 +249,6 @@ class SmartTransactionHook {
 
       await this.#processApprovalIfNeeded(uuid);
 
-      const transactionHash = await this.#waitForTransactionHash({
-        uuid,
-      });
-
-      if (transactionHash === null) {
-        throw new Error(
-          'submitBatch: Transaction does not have a transaction hash, there was a problem',
-        );
-      }
-
       let submitBatchResponse;
       if (submitTransactionResponse?.txHashes) {
         submitBatchResponse = {
@@ -270,6 +260,26 @@ class SmartTransactionHook {
         submitBatchResponse = {
           results: [],
         };
+      }
+
+      const extensionReturnTxHashAsapBatch =
+        this.#featureFlags?.extensionReturnTxHashAsapBatch;
+
+      if (
+        extensionReturnTxHashAsapBatch &&
+        submitBatchResponse?.results?.length > 0
+      ) {
+        return submitBatchResponse;
+      }
+
+      const transactionHash = await this.#waitForTransactionHash({
+        uuid,
+      });
+
+      if (transactionHash === null) {
+        throw new Error(
+          'submitBatch: Transaction does not have a transaction hash, there was a problem',
+        );
       }
 
       return submitBatchResponse;
@@ -367,6 +377,7 @@ class SmartTransactionHook {
               status: SmartTransactionStatuses.PENDING,
               creationTime: Date.now(),
               uuid,
+              chainId: this.#chainId,
             },
             isDapp: this.#isDapp,
             txId: this.#transactionMeta.id,
@@ -449,6 +460,7 @@ class SmartTransactionHook {
   }: {
     getFeesResponse?: Fees;
   } = {}) {
+    let signedTransactionsWithMetadata: SignedTransactionWithMetadata[] = [];
     let signedTransactions: string[] = [];
 
     if (
@@ -457,22 +469,55 @@ class SmartTransactionHook {
       this.#transactions.length > 0
     ) {
       // Batch transaction mode - extract signed transactions from this.#transactions[].signedTx
-      signedTransactions = this.#transactions
+      signedTransactionsWithMetadata = this.#transactions
         .filter((tx) => tx?.signedTx)
-        .map((tx) => tx.signedTx);
+        .map((tx) => {
+          const transactionMeta = getTransactionById(
+            tx.id ?? '',
+            this.#transactionController,
+          );
+          const signedTx: SignedTransactionWithMetadata = { tx: tx.signedTx };
+          if (transactionMeta) {
+            signedTx.metadata = {
+              txType: transactionMeta.type,
+              client: getClientForTransactionMetadata(),
+              origin: sanitizeOrigin(transactionMeta.origin),
+            };
+          }
+          return signedTx;
+        });
     } else if (this.#signedTransactionInHex) {
       // Single transaction mode with pre-signed transaction
-      signedTransactions = [this.#signedTransactionInHex];
+      signedTransactionsWithMetadata = [
+        {
+          tx: this.#signedTransactionInHex,
+          metadata: {
+            txType: this.#transactionMeta.type,
+            client: getClientForTransactionMetadata(),
+            origin: sanitizeOrigin(this.#transactionMeta.origin),
+          },
+        },
+      ];
     } else if (getFeesResponse) {
       // Single transaction mode requiring signing
-      signedTransactions = await this.#createSignedTransactions(
+      const signed = await this.#createSignedTransactions(
         getFeesResponse.tradeTxFees?.fees ?? [],
         false,
       );
+      signedTransactionsWithMetadata = signed.map((signedTx) => ({
+        tx: signedTx,
+        metadata: {
+          txType: this.#transactionMeta.type,
+          client: getClientForTransactionMetadata(),
+          origin: sanitizeOrigin(this.#transactionMeta.origin),
+        },
+      }));
     }
+    signedTransactions = signedTransactionsWithMetadata.map((tx) => tx.tx);
 
     return await this.#smartTransactionsController.submitSignedTransactions({
       signedTransactions,
+      signedTransactionsWithMetadata,
       signedCanceledTransactions: [],
       txParams: this.#txParams,
       transactionMeta: this.#transactionMeta,
@@ -546,19 +591,21 @@ function getUIState(flatState: ControllerFlatState) {
   return { metamask: flatState };
 }
 
-function getSmartTransactionCommonParams(
+export function getSmartTransactionCommonParams(
   flatState: ControllerFlatState,
-  chainId?: string,
+  chainId?: Hex,
 ) {
   // UI state is required to support shared selectors to avoid duplicate logic in frontend and backend.
   // Ideally all backend logic would instead rely on messenger event / state subscriptions.
   const uiState = getUIState(flatState);
-
+  const effectiveChainId = chainId ?? getCurrentChainId(uiState);
   // @ts-expect-error Smart transaction selector types does not match controller state
   const isSmartTransaction = getIsSmartTransaction(uiState, chainId);
 
-  // @ts-expect-error Smart transaction selector types does not match controller state
-  const featureFlags = getFeatureFlagsByChainId(uiState, chainId);
+  const featureFlags = getSmartTransactionsFeatureFlagsForChain(
+    uiState,
+    effectiveChainId,
+  );
 
   const isHardwareWalletAccount = isHardwareWallet(uiState);
 
@@ -567,108 +614,4 @@ function getSmartTransactionCommonParams(
     featureFlags,
     isHardwareWalletAccount,
   };
-}
-
-export async function publishHook({
-  flatState,
-  initMessenger,
-  signedTx,
-  smartTransactionsController,
-  transactionController,
-  transactionMeta,
-}: {
-  flatState: ControllerFlatState;
-  initMessenger: TransactionControllerInitMessenger;
-  signedTx: string;
-  smartTransactionsController: SmartTransactionsController;
-  transactionController: TransactionController;
-  transactionMeta: TransactionMeta;
-}) {
-  const { isSmartTransaction, featureFlags, isHardwareWalletAccount } =
-    getSmartTransactionCommonParams(flatState, transactionMeta.chainId);
-  const sendBundleSupport = await isSendBundleSupported(
-    transactionMeta.chainId,
-  );
-
-  if (!isSmartTransaction || !sendBundleSupport) {
-    const hook = new Delegation7702PublishHook({
-      isAtomicBatchSupported: transactionController.isAtomicBatchSupported.bind(
-        transactionController,
-      ),
-      messenger: initMessenger,
-    }).getHook();
-
-    return await hook(transactionMeta, signedTx);
-  }
-
-  if (
-    isSmartTransaction &&
-    (sendBundleSupport || transactionMeta.selectedGasFeeToken !== undefined)
-  ) {
-    const result = await submitSmartTransactionHook({
-      transactionMeta,
-      signedTransactionInHex: signedTx as Hex,
-      transactionController,
-      smartTransactionsController,
-      controllerMessenger: initMessenger,
-      isSmartTransaction,
-      isHardwareWallet: isHardwareWalletAccount,
-      // @ts-expect-error Smart transaction selector return type does not match FeatureFlags type from hook
-      featureFlags,
-    });
-
-    if (result?.transactionHash) {
-      return result;
-    }
-  }
-
-  // Default: fall back to regular transaction submission
-  return { transactionHash: undefined };
-}
-
-export function publishBatchHook({
-  transactionController,
-  smartTransactionsController,
-  hookControllerMessenger,
-  flatState,
-  transactions,
-}: {
-  transactionController: TransactionController;
-  smartTransactionsController: SmartTransactionsController;
-  hookControllerMessenger: SmartTransactionHookMessenger;
-  flatState: ControllerFlatState;
-  transactions: PublishBatchHookTransaction[];
-}) {
-  // Get transactionMeta based on the last transaction ID
-  const lastTransaction = transactions[transactions.length - 1];
-  const transactionMeta = getTransactionById(
-    lastTransaction.id ?? '',
-    transactionController,
-  );
-
-  // If we couldn't find the transaction, we should handle that gracefully
-  if (!transactionMeta) {
-    throw new Error(
-      `publishBatchSmartTransactionHook: Could not find transaction with id ${lastTransaction.id}`,
-    );
-  }
-
-  const { isSmartTransaction, featureFlags, isHardwareWalletAccount } =
-    getSmartTransactionCommonParams(flatState, transactionMeta.chainId);
-
-  if (!isSmartTransaction) {
-    return undefined;
-  }
-
-  return submitBatchSmartTransactionHook({
-    transactions,
-    transactionController,
-    smartTransactionsController,
-    controllerMessenger: hookControllerMessenger,
-    isSmartTransaction,
-    isHardwareWallet: isHardwareWalletAccount,
-    // @ts-expect-error Smart transaction selector return type does not match FeatureFlags type from hook
-    featureFlags,
-    transactionMeta,
-  });
 }

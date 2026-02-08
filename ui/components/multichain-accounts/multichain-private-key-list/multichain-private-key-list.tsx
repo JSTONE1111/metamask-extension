@@ -29,6 +29,13 @@ import {
   getInternalAccountsFromGroupById,
 } from '../../../selectors/multichain-accounts/account-tree';
 import { verifyPassword, exportAccounts } from '../../../store/actions';
+import {
+  endTrace,
+  trace,
+  TraceName,
+  TraceOperation,
+} from '../../../../shared/lib/trace';
+import { MINUTE } from '../../../../shared/constants/time';
 
 /**
  * Check if the account has the private key available according to its keyring type.
@@ -78,7 +85,8 @@ const MultichainPrivateKeyList = ({
     [cleanStateVariables],
   );
 
-  const [, handleCopy] = useCopyToClipboard();
+  // useCopyToClipboard analysis: Copies one of your private keys
+  const [, handleCopy] = useCopyToClipboard({ clearDelayMs: MINUTE });
 
   const accountsSpreadByNetworkByGroupId = useSelector((state) =>
     getInternalAccountListSpreadByScopesByGroupId(state, groupId),
@@ -100,6 +108,10 @@ const MultichainPrivateKeyList = ({
       await verifyPassword(password);
       setWrongPassword(false);
       setReveal(true);
+      trace({
+        name: TraceName.ShowAccountPrivateKeyList,
+        op: TraceOperation.AccountUi,
+      });
     } catch (error) {
       setWrongPassword(true);
       setReveal(false);
@@ -235,6 +247,14 @@ const MultichainPrivateKeyList = ({
       renderAddressItem(item, index),
     );
   }, [accountsSpreadByNetworkByGroupId, renderAddressItem]);
+
+  useEffect(() => {
+    if (reveal) {
+      endTrace({
+        name: TraceName.ShowAccountPrivateKeyList,
+      });
+    }
+  }, [reveal]);
 
   return (
     <Box

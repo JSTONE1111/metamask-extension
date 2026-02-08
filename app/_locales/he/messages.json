@@ -229,14 +229,8 @@
   "enterPasswordContinue": {
     "message": "יש להזין ססמה כדי להמשיך"
   },
-  "ethereumPublicAddress": {
-    "message": "כתובת אתריום ציבורית"
-  },
   "etherscanView": {
     "message": "הצג חשבון ב- Etherscan"
-  },
-  "expandView": {
-    "message": "הרחב תצוגה"
   },
   "failed": {
     "message": "נכשל"
@@ -387,9 +381,6 @@
   "needImportFile": {
     "message": "יש לבחור קובץ לייצוא.",
     "description": "User is important an account and needs to add a file to continue"
-  },
-  "negativeETH": {
-    "message": "לא ניתן לשלוח סכומים שליליים של ETH."
   },
   "networkName": {
     "message": "שם רשת"

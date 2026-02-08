@@ -2,7 +2,7 @@ import React from 'react';
 import { Hex } from '@metamask/utils';
 import configureStore from '../../../../store/store';
 import mockState from '../../../../../test/data/mock-state.json';
-import { renderWithProvider } from '../../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import { GatorPermissionsPage } from './gator-permissions-page';
 
 const MOCK_CHAIN_ID = '0x1' as Hex;
@@ -13,7 +13,7 @@ mockState.metamask.gatorPermissionsMapSerialized = JSON.stringify({
       {
         permissionResponse: {
           chainId: MOCK_CHAIN_ID,
-          address: '0xB68c70159E9892DdF5659ec42ff9BD2bbC23e778',
+          from: '0xB68c70159E9892DdF5659ec42ff9BD2bbC23e778',
           permission: {
             type: 'native-token-periodic',
             isAdjustmentAllowed: false,
@@ -26,9 +26,7 @@ mockState.metamask.gatorPermissionsMapSerialized = JSON.stringify({
             },
           },
           context: '0x00000000',
-          signerMeta: {
-            delegationManager: '0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3',
-          },
+          delegationManager: '0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3',
         },
         siteOrigin: 'http://localhost:8000',
       },
@@ -37,6 +35,7 @@ mockState.metamask.gatorPermissionsMapSerialized = JSON.stringify({
   'native-token-stream': {},
   'erc20-token-stream': {},
   'erc20-token-periodic': {},
+  'erc20-token-revocation': {},
   other: {},
 });
 mockState.metamask.isGatorPermissionsEnabled = true;

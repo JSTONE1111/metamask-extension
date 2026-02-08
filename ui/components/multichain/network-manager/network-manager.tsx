@@ -1,15 +1,11 @@
 import {
+  type NetworkConfiguration,
   RpcEndpointType,
   UpdateNetworkFields,
 } from '@metamask/network-controller';
 import React, { useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  Route,
-  Routes,
-  useNavigate,
-  useLocation,
-} from 'react-router-dom-v5-compat';
+import { Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import * as URI from 'uri-js';
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import { useNetworkFormState } from '../../../pages/settings/networks-tab/networks-form/networks-form-state';
@@ -27,6 +23,7 @@ import {
 import AddBlockExplorerModal from '../network-list-menu/add-block-explorer-modal/add-block-explorer-modal';
 import AddRpcUrlModal from '../network-list-menu/add-rpc-url-modal/add-rpc-url-modal';
 import { SelectRpcUrlModal } from '../network-list-menu/select-rpc-url-modal/select-rpc-url-modal';
+import { DEFAULT_ROUTE } from '../../../helpers/constants/routes';
 import { AddNetwork } from './components/add-network';
 import { NetworkTabs } from './network-tabs';
 import { useNetworkManagerInitialTab } from './hooks/useNetworkManagerState';
@@ -53,7 +50,9 @@ export const NetworkManager = () => {
       return undefined;
     }
     if (location.pathname === '/select-rpc') {
-      return evmNetworks[editingChainId as keyof typeof evmNetworks];
+      return editingChainId
+        ? evmNetworks[editingChainId as keyof typeof evmNetworks]
+        : undefined;
     }
     return !editingChainId || editCompleted
       ? undefined
@@ -120,11 +119,11 @@ export const NetworkManager = () => {
   const handleClose = () => {
     dispatch(hideModal());
     dispatch(setEditedNetwork());
-    navigate('/');
+    navigate(DEFAULT_ROUTE);
   };
 
   const handleGoHome = () => {
-    navigate('/');
+    navigate(DEFAULT_ROUTE);
   };
 
   const handleEditOnComplete = useCallback(() => {
@@ -270,7 +269,10 @@ export const NetworkManager = () => {
                 >
                   {t('selectRpcUrl')}
                 </ModalHeader>
-                <SelectRpcUrlModal onNetworkChange={handleClose} />
+                <SelectRpcUrlModal
+                  networkConfiguration={editedNetwork as NetworkConfiguration}
+                  onNetworkChange={handleClose}
+                />
               </>
             }
           />

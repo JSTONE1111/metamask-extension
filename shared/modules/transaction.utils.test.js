@@ -1,4 +1,7 @@
-import { TransactionType } from '@metamask/transaction-controller';
+import {
+  GasFeeEstimateType,
+  TransactionType,
+} from '@metamask/transaction-controller';
 
 import BigNumber from 'bignumber.js';
 import { createTestProviderTools } from '../../test/stub/provider';
@@ -10,6 +13,8 @@ import {
 import { buildSetApproveForAllTransactionData } from '../../test/data/confirmations/set-approval-for-all';
 import {
   determineTransactionType,
+  getMarketFeeFromEstimates,
+  getTransactionDataRecipient,
   hasTransactionData,
   isEIP1559Transaction,
   isLegacyTransaction,
@@ -54,13 +59,9 @@ describe('Transaction.utils', function () {
       );
 
       expect(result.name).toBe('approve');
-      expect(result.args).toStrictEqual(
-        expect.objectContaining({
-          token: ADDRESS_MOCK,
-          spender: ADDRESS_2_MOCK,
-          expiration: EXPIRATION_MOCK,
-        }),
-      );
+      expect(result.args.token).toBe(ADDRESS_MOCK);
+      expect(result.args.spender).toBe(ADDRESS_2_MOCK);
+      expect(result.args.expiration).toBe(EXPIRATION_MOCK);
       expect(result.args.amount.toString()).toBe(AMOUNT_MOCK.toString());
     });
   });
@@ -617,6 +618,129 @@ describe('Transaction.utils', function () {
         spender: ADDRESS_2_MOCK,
         tokenAddress: ADDRESS_MOCK,
       });
+    });
+  });
+
+  describe('getTransactionDataRecipient', () => {
+    const RECIPIENT_ADDRESS = '0x50A9D56C2B8BA9A5c7f2C08C3d26E0499F23a706';
+    it('returns recipient address from standard ERC20 transfer', () => {
+      // Standard transfer(address _to, uint256 _value)
+      const data =
+        '0xa9059cbb00000000000000000000000050a9d56c2b8ba9a5c7f2c08c3d26e0499f23a7060000000000000000000000000000000000000000000000000000000000004e20';
+
+      const result = getTransactionDataRecipient(data);
+
+      expect(result).toBe(RECIPIENT_ADDRESS);
+    });
+
+    it('returns undefined for empty data', () => {
+      const result = getTransactionDataRecipient('');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined for 0x', () => {
+      const result = getTransactionDataRecipient('0x');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined for non-transfer function data', () => {
+      // approve(address spender, uint256 amount)
+      const data =
+        '0x095ea7b3' +
+        '00000000000000000000000050a9d56c2b8ba9a5c7f2c08c3d26e0499f23a706' +
+        '0000000000000000000000000000000000000000000000000000000000004e20';
+
+      const result = getTransactionDataRecipient(data);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined for invalid hex data', () => {
+      const result = getTransactionDataRecipient('0xinvalid');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined for too short data', () => {
+      const result = getTransactionDataRecipient('0x12345678');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('returns undefined for unrecognized function selector', () => {
+      const data =
+        '0xffffffff' + // unknown function selector
+        '00000000000000000000000050a9d56c2b8ba9a5c7f2c08c3d26e0499f23a706' +
+        '0000000000000000000000000000000000000000000000000000000000004e20';
+
+      const result = getTransactionDataRecipient(data);
+
+      expect(result).toBeUndefined();
+    });
+
+    it('handles malformed transaction data gracefully', () => {
+      const data = '0xa9059cbb123'; // incomplete data
+
+      const result = getTransactionDataRecipient(data);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('getMarketFeeFromEstimates', () => {
+    it('returns undefined when gasFeeEstimates is undefined', () => {
+      expect(getMarketFeeFromEstimates(undefined)).toBeUndefined();
+    });
+
+    it('returns medium.maxFeePerGas for FeeMarket type estimates', () => {
+      const estimates = {
+        type: GasFeeEstimateType.FeeMarket,
+        low: { maxFeePerGas: '0x1', maxPriorityFeePerGas: '0x1' },
+        medium: { maxFeePerGas: '0x2', maxPriorityFeePerGas: '0x2' },
+        high: { maxFeePerGas: '0x3', maxPriorityFeePerGas: '0x3' },
+      };
+
+      expect(getMarketFeeFromEstimates(estimates)).toBe('0x2');
+    });
+
+    it('returns medium for Legacy type estimates', () => {
+      const estimates = {
+        type: GasFeeEstimateType.Legacy,
+        low: '0x1',
+        medium: '0x2',
+        high: '0x3',
+      };
+
+      expect(getMarketFeeFromEstimates(estimates)).toBe('0x2');
+    });
+
+    it('returns gasPrice for GasPrice type estimates', () => {
+      const estimates = {
+        type: GasFeeEstimateType.GasPrice,
+        gasPrice: '0x5',
+      };
+
+      expect(getMarketFeeFromEstimates(estimates)).toBe('0x5');
+    });
+
+    it('returns undefined for unknown estimate type', () => {
+      const estimates = {
+        type: 'unknown-type',
+      };
+
+      expect(getMarketFeeFromEstimates(estimates)).toBeUndefined();
+    });
+
+    it('returns undefined when FeeMarket medium is missing', () => {
+      const estimates = {
+        type: GasFeeEstimateType.FeeMarket,
+        low: { maxFeePerGas: '0x1', maxPriorityFeePerGas: '0x1' },
+        high: { maxFeePerGas: '0x3', maxPriorityFeePerGas: '0x3' },
+      };
+
+      expect(getMarketFeeFromEstimates(estimates)).toBeUndefined();
     });
   });
 });

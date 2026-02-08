@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { useSelector } from 'react-redux';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { InternalAccount } from '@metamask/keyring-internal-api';
 import { CaipChainId } from '@metamask/utils';
 import { KeyringTypes } from '@metamask/keyring-controller';
@@ -104,8 +104,8 @@ export const CreateAccount: CreateAccountComponent = React.memo(
     ) => {
       const t = useI18nContext();
 
-      const history = useHistory();
-      const trackEvent = useContext(MetaMetricsContext);
+      const navigate = useNavigate();
+      const { trackEvent } = useContext(MetaMetricsContext);
       const hdEntropyIndex = useSelector(getHDEntropyIndex);
 
       const mostRecentOverviewPage = useSelector(getMostRecentOverviewPage);
@@ -179,7 +179,7 @@ export const CreateAccount: CreateAccountComponent = React.memo(
               },
             });
             if (redirectToOverview) {
-              history.push(mostRecentOverviewPage);
+              navigate(mostRecentOverviewPage);
             }
           } catch (error) {
             setLoading(false);

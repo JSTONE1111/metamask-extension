@@ -5,7 +5,7 @@ import {
   MetaMetricsEventName,
 } from '../../../../shared/constants/metametrics';
 import { onlyKeepHost } from '../../../../shared/lib/only-keep-host';
-import { isPublicEndpointUrl } from '../../../../shared/lib/network-utils';
+import { isPublicEndpointUrl } from '../util';
 import MetaMetricsController from '../../controllers/metametrics-controller';
 import { shouldCreateRpcServiceEvents } from './utils';
 
@@ -137,13 +137,16 @@ export function trackRpcEndpointEvent(
     return;
   }
 
+  const sanitizedUrl = isPublicEndpointUrl(endpointUrl, infuraProjectId)
+    ? onlyKeepHost(endpointUrl)
+    : 'custom';
+
   // The names of Segment properties have a particular case.
   /* eslint-disable @typescript-eslint/naming-convention */
   const properties = {
     chain_id_caip: `eip155:${hexToNumber(chainId)}`,
-    rpc_endpoint_url: isPublicEndpointUrl(endpointUrl, infuraProjectId)
-      ? onlyKeepHost(endpointUrl)
-      : 'custom',
+    rpc_domain: sanitizedUrl,
+    rpc_endpoint_url: sanitizedUrl, // @deprecated - Will be removed in a future release.
     ...(isObject(error) &&
     'httpStatus' in error &&
     isValidJson(error.httpStatus)

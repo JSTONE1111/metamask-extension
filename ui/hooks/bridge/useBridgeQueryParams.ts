@@ -1,19 +1,11 @@
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useHistory, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  CaipAssetType,
+  type CaipAssetType,
   CaipAssetTypeStruct,
   parseCaipAssetType,
 } from '@metamask/utils';
-import {
-  formatChainIdToCaip,
-  getNativeAssetForChainId,
-  isCrossChain,
-  isNativeAddress,
-} from '@metamask/bridge-controller';
-import { type InternalAccount } from '@metamask/keyring-internal-api';
-import { type NetworkConfiguration } from '@metamask/network-controller';
 import {
   type AssetMetadata,
   fetchAssetMetadataForAssetIds,
@@ -21,19 +13,13 @@ import {
 import { BridgeQueryParams } from '../../../shared/lib/deep-links/routes/swap';
 import { calcTokenAmount } from '../../../shared/lib/transactions-controller-utils';
 import {
-  setEVMSrcTokenBalance,
-  setEVMSrcNativeBalance,
-  setFromChain,
+  setEvmBalances,
   setFromToken,
   setFromTokenInputValue,
   setToToken,
 } from '../../ducks/bridge/actions';
-import {
-  getFromAccount,
-  getFromChain,
-  getFromChains,
-  getFromToken,
-} from '../../ducks/bridge/selectors';
+import { getFromToken } from '../../ducks/bridge/selectors';
+import { getMultichainCurrentChainId } from '../../selectors/multichain';
 
 const parseAsset = (assetId: string | null) => {
   if (!assetId) {
@@ -80,15 +66,17 @@ const fetchAssetMetadata = async (
  */
 export const useBridgeQueryParams = () => {
   const dispatch = useDispatch();
-  const fromChains = useSelector(getFromChains);
-  const fromChain = useSelector(getFromChain);
   const fromToken = useSelector(getFromToken);
-  const selectedAccount = useSelector(getFromAccount);
 
   const abortController = useRef<AbortController>(new AbortController());
 
-  const { search } = useLocation();
-  const history = useHistory();
+  /**
+   * @deprecated remove this when GNS references are removed
+   */
+  const currentChainId = useSelector(getMultichainCurrentChainId);
+
+  const { search, pathname, state } = useLocation();
+  const navigate = useNavigate();
 
   // Parse CAIP asset data
   const searchParams = useMemo(() => new URLSearchParams(search), [search]);
@@ -102,9 +90,15 @@ export const useBridgeQueryParams = () => {
           updatedSearchParams.delete(param);
         }
       });
-      history.replace({ search: updatedSearchParams.toString() });
+      navigate(
+        {
+          pathname,
+          search: updatedSearchParams.toString(),
+        },
+        { replace: true },
+      );
     },
-    [search, history],
+    [search, pathname, navigate],
   );
 
   const [parsedFromAssetId, setParsedFromAssetId] =
@@ -161,67 +155,9 @@ export const useBridgeQueryParams = () => {
     }
   }, [searchParams]);
 
-  // Set fromChain and fromToken
-  const setFromChainAndToken = useCallback(
-    (
-      fromTokenMetadata,
-      fromAsset,
-      networks: NetworkConfiguration[],
-      account: InternalAccount | null,
-      network?: NetworkConfiguration,
-    ) => {
-      const { chainId: assetChainId } = fromAsset;
-
-      if (fromTokenMetadata) {
-        const { chainId, assetReference } = parseCaipAssetType(
-          fromTokenMetadata.assetId,
-        );
-        const nativeAsset = getNativeAssetForChainId(chainId);
-        // TODO remove this after v36.0.0 bridge-controller bump
-        const isNativeReference = nativeAsset?.assetId.includes(assetReference);
-        const token = {
-          ...fromTokenMetadata,
-          chainId,
-          address:
-            isNativeReference || isNativeAddress(assetReference)
-              ? (nativeAsset?.address ?? '')
-              : assetReference,
-        };
-        // If asset's chain is the same as fromChain, only set the fromToken
-        if (network && assetChainId === formatChainIdToCaip(network.chainId)) {
-          dispatch(setFromToken(token));
-        } else {
-          // Find the chain matching the srcAsset's chainId
-          const targetChain = networks.find(
-            (chain) => formatChainIdToCaip(chain.chainId) === assetChainId,
-          );
-          if (targetChain) {
-            dispatch(
-              setFromChain({
-                networkConfig: targetChain,
-                selectedAccount: account,
-                token,
-              }),
-            );
-          }
-        }
-      }
-    },
-    [],
-  );
-
   const setToChainAndToken = useCallback(
     async (toTokenMetadata: AssetMetadata) => {
-      const { chainId, assetReference } = parseCaipAssetType(
-        toTokenMetadata.assetId,
-      );
-      dispatch(
-        setToToken({
-          ...toTokenMetadata,
-          chainId,
-          address: assetReference,
-        }),
-      );
+      dispatch(setToToken(toTokenMetadata));
       // Clear parsed to asset ID after successful processing
       setParsedToAssetId(null);
     },
@@ -230,7 +166,7 @@ export const useBridgeQueryParams = () => {
 
   // Main effect to orchestrate the parameter processing
   useEffect(() => {
-    if (!parsedFromAssetId || !assetMetadataByAssetId || !fromChains.length) {
+    if (!parsedFromAssetId || !assetMetadataByAssetId) {
       return;
     }
 
@@ -241,20 +177,10 @@ export const useBridgeQueryParams = () => {
       ];
 
     // Process from chain/token first
-    setFromChainAndToken(
-      fromTokenMetadata,
-      parsedFromAssetId,
-      fromChains,
-      selectedAccount,
-      fromChain,
-    );
-  }, [
-    assetMetadataByAssetId,
-    parsedFromAssetId,
-    fromChains,
-    fromChain,
-    selectedAccount,
-  ]);
+    if (fromTokenMetadata) {
+      dispatch(setFromToken(fromTokenMetadata));
+    }
+  }, [assetMetadataByAssetId, parsedFromAssetId]);
 
   // Set toChainId and toToken
   useEffect(() => {
@@ -276,6 +202,7 @@ export const useBridgeQueryParams = () => {
     if (
       parsedFromAssetId &&
       fromToken &&
+      assetMetadataByAssetId &&
       fromToken.assetId?.toLowerCase() ===
         parsedFromAssetId.assetId.toLowerCase()
     ) {
@@ -292,27 +219,20 @@ export const useBridgeQueryParams = () => {
         setParsedAmount(null);
       }
     }
-  }, [parsedAmount, parsedFromAssetId, fromToken]);
+  }, [parsedAmount, parsedFromAssetId, assetMetadataByAssetId, fromToken]);
 
   // Set src token balance after url params are applied
-  // This effect runs on each load regardless of the url params
+  // This effect runs on each token change regardless of the url params
   useEffect(() => {
-    if (
-      // Wait for url params to be applied
-      !parsedFromAssetId &&
-      !searchParams.get(BridgeQueryParams.FROM) &&
-      fromToken &&
-      // Wait for network to be changed if needed
-      !isCrossChain(fromToken.chainId, fromChain?.chainId) &&
-      selectedAccount
-    ) {
-      dispatch(setEVMSrcTokenBalance(fromToken, selectedAccount.address));
-      dispatch(
-        setEVMSrcNativeBalance({
-          selectedAddress: selectedAccount.address,
-          chainId: fromToken.chainId,
-        }),
-      );
+    if (fromToken?.assetId) {
+      dispatch(setEvmBalances(fromToken.assetId));
     }
-  }, [parsedFromAssetId, selectedAccount, fromToken, fromChain, searchParams]);
+  }, [fromToken, fromToken?.assetId, currentChainId]);
+
+  // If srcToken object is passed through navigation options, use it as the fromToken
+  useEffect(() => {
+    if (state?.srcToken) {
+      dispatch(setFromToken(state.srcToken));
+    }
+  }, [state?.srcToken]);
 };

@@ -18,7 +18,11 @@ import {
   isSolanaAccount,
 } from '../../../selectors';
 import { MetaMaskReduxState } from '../../../store/store';
-import { PasswordChangeToastType } from '../../../../shared/constants/app-state';
+import {
+  PasswordChangeToastType,
+  ClaimSubmitToastType,
+  StorageWriteErrorType,
+} from '../../../../shared/constants/app-state';
 import { AccountGroupWithInternalAccounts } from '../../../selectors/multichain-accounts/account-tree.types';
 import { getCaip25CaveatValueFromPermissions } from '../../../pages/permissions-connect/connect-page/utils';
 import { supportsChainIds } from '../../../hooks/useAccountGroupsForPermissions';
@@ -32,6 +36,8 @@ type State = {
       | 'showNewSrpAddedToast'
       | 'showPasswordChangeToast'
       | 'showCopyAddressToast'
+      | 'showClaimSubmitToast'
+      | 'showInfuraSwitchToast'
     >
   >;
   metamask: Partial<
@@ -41,6 +47,14 @@ type State = {
       | 'newPrivacyPolicyToastShownDate'
       | 'onboardingDate'
       | 'surveyLinkLastClickedOrClosed'
+      | 'shieldEndingToastLastClickedOrClosed'
+      | 'shieldPausedToastLastClickedOrClosed'
+      | 'participateInMetaMetrics'
+      | 'remoteFeatureFlags'
+      | 'pna25Acknowledged'
+      | 'completedOnboarding'
+      | 'storageWriteErrorType'
+      | 'isUnlocked'
     >
   >;
 };
@@ -106,6 +120,7 @@ export function selectShowConnectAccountToast(
   account: InternalAccount,
 ): boolean {
   const allowShowAccountSetting = getAlertEnabledness(state).unconnectedAccount;
+  const activeTabOrigin = getOriginOfCurrentTab(state);
   const connectedAccounts = getAllPermittedAccountsForCurrentTab(state);
 
   // We only support connection with EVM or Solana accounts
@@ -117,12 +132,12 @@ export function selectShowConnectAccountToast(
   const showConnectAccountToast =
     allowShowAccountSetting &&
     account &&
-    state.activeTab.origin &&
+    activeTabOrigin &&
     isConnectableAccount &&
     connectedAccounts.length > 0 &&
     !isInternalAccountInPermittedAccountIds(account, connectedAccounts);
 
-  return showConnectAccountToast;
+  return Boolean(showConnectAccountToast);
 }
 
 // If there is more than one connected account to activeTabOrigin,
@@ -152,11 +167,11 @@ export function selectShowConnectAccountGroupToast(
     allowShowAccountSetting &&
     accountGroup &&
     isAccountSupported &&
-    state.activeTab.origin &&
+    activeTabOrigin &&
     connectedAccounts.length > 0 &&
     !isConnected;
 
-  return showConnectAccountToast;
+  return Boolean(showConnectAccountToast);
 }
 
 /**
@@ -191,4 +206,131 @@ export function selectShowCopyAddressToast(
   state: Pick<State, 'appState'>,
 ): boolean {
   return Boolean(state.appState.showCopyAddressToast);
+}
+
+/**
+ * Retrieves the state for the "Claim Submit" toast
+ *
+ * @param state - Redux state object.
+ * @returns ClaimSubmitToastType or null
+ */
+export function selectClaimSubmitToast(
+  state: Pick<State, 'appState'>,
+): ClaimSubmitToastType | null {
+  return state.appState.showClaimSubmitToast || null;
+}
+
+/**
+ * Retrieves user preference to see the "Updated to MetaMask default" toast
+ *
+ * @param state - Redux state object.
+ * @returns Boolean preference value
+ */
+export function selectShowInfuraSwitchToast(
+  state: Pick<State, 'appState'>,
+): boolean {
+  return Boolean(state.appState.showInfuraSwitchToast);
+}
+
+/**
+ * Retrieves user preference to see the "Shield Payment Declined" toast
+ *
+ * @param state - Redux state object.
+ * @returns Boolean preference value
+ */
+export function selectShowShieldPausedToast(
+  state: Pick<State, 'metamask'>,
+): boolean {
+  return !state.metamask.shieldPausedToastLastClickedOrClosed;
+}
+
+/**
+ * Retrieves user preference to see the "Shield Coverage Ending" toast
+ *
+ * @param state - Redux state object.
+ * @returns Boolean preference value
+ */
+export function selectShowShieldEndingToast(
+  state: Pick<State, 'metamask'>,
+): boolean {
+  return !state.metamask.shieldEndingToastLastClickedOrClosed;
+}
+
+/**
+ * Determines if the storage error toast should be shown based on:
+ * - storageWriteErrorType is set (not null/undefined, indicates an error occurred)
+ * - User has completed onboarding
+ * - Wallet is unlocked
+ *
+ * @param state - Redux state object.
+ * @returns Boolean indicating whether to show the toast
+ */
+export function selectShowStorageErrorToast(
+  state: Pick<State, 'metamask'>,
+): boolean {
+  const { storageWriteErrorType, completedOnboarding, isUnlocked } =
+    state.metamask || {};
+
+  // Check for truthy value to handle both null and undefined as "no error"
+  return Boolean(storageWriteErrorType && completedOnboarding && isUnlocked);
+}
+
+/**
+ * Returns the type of storage write error that occurred.
+ * Used to show specific error messages (e.g., disk space vs default error).
+ *
+ * @param state - Redux state object.
+ * @returns The storage write error type or null if no error
+ */
+export function selectStorageWriteErrorType(
+  state: Pick<State, 'metamask'>,
+): StorageWriteErrorType | null {
+  return state.metamask?.storageWriteErrorType ?? null;
+}
+
+/**
+ * Determines if the PNA25 banner should be shown based on:
+ * - User has completed onboarding (completedOnboarding === true)
+ * - LaunchDarkly feature flag (extensionUxPna25) is enabled
+ * - User has opted into metrics (participateInMetaMetrics === true)
+ * - User hasn't acknowledged the banner yet (pna25Acknowledged === false)
+ *
+ * Regular new users: Go through metametrics page → pna25Acknowledged = true → don't see banner
+ * Social login users: Skip metametrics page → pna25Acknowledged = false → see banner
+ * Existing users: pna25Acknowledged = false (default) → see banner
+ *
+ * @param state - The application state containing the banner data.
+ * @returns Boolean indicating whether to show the banner
+ */
+export function selectShowPna25Modal(state: Pick<State, 'metamask'>): boolean {
+  const {
+    completedOnboarding,
+    participateInMetaMetrics,
+    pna25Acknowledged,
+    remoteFeatureFlags,
+  } = state.metamask || {};
+
+  // Only show to users who have completed onboarding
+  if (!completedOnboarding) {
+    return false; // User hasn't completed onboarding yet
+  }
+
+  // For onboarding screen, we use local flag and for existing users, we use LaunchDarkly flag
+  const isPna25Enabled = remoteFeatureFlags?.extensionUxPna25;
+
+  // Check all conditions
+  if (!isPna25Enabled) {
+    return false; // LD flag not enabled
+  }
+
+  if (participateInMetaMetrics !== true) {
+    return false; // User hasn't opted into metrics
+  }
+
+  if (pna25Acknowledged === true) {
+    return false; // User already acknowledged
+  }
+
+  // Only show banner if explicitly false (existing users who haven't acknowledged)
+  return pna25Acknowledged === false;
 }

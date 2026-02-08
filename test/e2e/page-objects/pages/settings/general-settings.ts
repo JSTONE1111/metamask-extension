@@ -13,6 +13,9 @@ class GeneralSettings {
     tag: 'h4',
   };
 
+  private readonly hideTokensWithoutBalanceToggle =
+    '[id="toggle-zero-balance"] .toggle-button';
+
   private readonly jazziconsAccountIdenticon = {
     tag: 'h6',
     text: 'Jazzicons',
@@ -27,6 +30,9 @@ class GeneralSettings {
     blockies: '[data-testid="blockie_icon"]',
     jazzicon: '[data-testid="jazz_icon"]',
   };
+
+  private readonly toggleNativeTokenAsMainBalance =
+    '[id="toggle-show-native-token-as-main-balance"] .toggle-button';
 
   constructor(driver: Driver) {
     this.driver = driver;
@@ -99,6 +105,14 @@ class GeneralSettings {
 
   async checkNoLoadingOverlaySpinner(): Promise<void> {
     await this.driver.assertElementNotPresent(this.loadingOverlaySpinner);
+  }
+
+  async toggleHideTokensWithoutBalance(): Promise<void> {
+    await this.driver.clickElement(this.hideTokensWithoutBalanceToggle);
+  }
+
+  async toggleShowNativeTokenAsMainBalance(): Promise<void> {
+    await this.driver.clickElement(this.toggleNativeTokenAsMainBalance);
   }
 }
 

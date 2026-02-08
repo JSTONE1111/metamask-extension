@@ -12,7 +12,6 @@ import DetectedToken from '../../detected-token/detected-token';
 import { usePrimaryCurrencyProperties } from '../hooks';
 import TokenList from '../token-list';
 import AssetListControlBar from './asset-list-control-bar';
-import AssetListFundingModals from './asset-list-funding-modals';
 
 export type AssetListProps = {
   onClickAsset: (chainId: string, address: string) => void;
@@ -25,7 +24,7 @@ const TokenListContainer = React.memo(
     onClickAsset,
     safeChains,
   }: Pick<AssetListProps, 'onClickAsset' | 'safeChains'>) => {
-    const trackEvent = useContext(MetaMetricsContext);
+    const { trackEvent } = useContext(MetaMetricsContext);
     const { primaryCurrencyProperties } = usePrimaryCurrencyProperties();
 
     const onTokenClick = useCallback(
@@ -68,7 +67,6 @@ const AssetList = ({
       {showDetectedTokens && (
         <DetectedToken setShowDetectedTokens={setShowDetectedTokens} />
       )}
-      <AssetListFundingModals />
     </>
   );
 };

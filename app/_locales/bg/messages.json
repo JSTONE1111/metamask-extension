@@ -229,14 +229,8 @@
   "enterPasswordContinue": {
     "message": "Въведете парола, за да продължите"
   },
-  "ethereumPublicAddress": {
-    "message": "Публичен адрес за етереум"
-  },
   "etherscanView": {
     "message": "Преглед на акаунта в Etherscan"
-  },
-  "expandView": {
-    "message": "Разгъване на изглед"
   },
   "failed": {
     "message": "Неуспешно"
@@ -390,9 +384,6 @@
   "needImportFile": {
     "message": "Трябва да изберете файл за импортиране.",
     "description": "User is important an account and needs to add a file to continue"
-  },
-  "negativeETH": {
-    "message": "Не може да изпраща отрицателни суми от ETH."
   },
   "networkName": {
     "message": "Име на мрежата"

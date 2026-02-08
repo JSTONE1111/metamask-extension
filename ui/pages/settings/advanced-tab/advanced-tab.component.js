@@ -436,7 +436,7 @@ export default class AdvancedTab extends PureComponent {
       <Box
         ref={this.settingsRefs[5]}
         className="settings-page__content-row"
-        data-testid="advanced-setting-show-testnet-conversion"
+        data-testid="advanced-setting-show-testnets"
         display={Display.Flex}
         flexDirection={FlexDirection.Row}
         justifyContent={JustifyContent.spaceBetween}
@@ -486,7 +486,21 @@ export default class AdvancedTab extends PureComponent {
         <div className="settings-page__content-item-col">
           <ToggleButton
             value={showExtensionInFullSizeView}
-            onToggle={(value) => setShowExtensionInFullSizeView(!value)}
+            onToggle={(value) => {
+              setShowExtensionInFullSizeView(!value);
+              this.context.trackEvent({
+                event: MetaMetricsEventName.SettingsUpdated,
+                category: MetaMetricsEventCategory.Settings,
+                properties: {
+                  settings_group: 'advanced',
+                  settings_type: 'open_full_screen',
+                  old_value: value,
+                  new_value: !value,
+                  open_full_screen: !value,
+                  location: 'Advanced Settings',
+                },
+              });
+            }}
             offLabel={t('off')}
             onLabel={t('on')}
           />

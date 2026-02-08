@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { BtcScope, SolScope } from '@metamask/keyring-api';
+import { BtcScope, SolScope, TrxScope } from '@metamask/keyring-api';
 import {
   Box,
   IconName,
@@ -34,7 +34,7 @@ type EditAccountAddAccountFormProps = {
 export const EditAccountAddAccountForm: React.FC<
   EditAccountAddAccountFormProps
 > = ({ accountType, onActionComplete, onBack, onClose }) => {
-  const trackEvent = useContext(MetaMetricsContext);
+  const { trackEvent } = useContext(MetaMetricsContext);
   const t = useI18nContext();
   const [showSrpSelection, setShowSrpSelection] = useState(false);
 
@@ -71,6 +71,12 @@ export const EditAccountAddAccountForm: React.FC<
           clientType: WalletClientType.Solana,
           chainId: SolScope.Mainnet,
           networkName: t('networkNameSolana'),
+        };
+      case WalletClientType.Tron:
+        return {
+          clientType: WalletClientType.Tron,
+          chainId: TrxScope.Mainnet,
+          networkName: t('networkNameTron'),
         };
       default:
         return { clientType: null, chainId: null, networkName: null };

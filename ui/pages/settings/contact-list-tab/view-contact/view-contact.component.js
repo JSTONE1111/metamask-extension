@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Navigate } from 'react-router-dom-v5-compat';
+import { Navigate } from 'react-router-dom';
 import { AvatarAccountSize } from '@metamask/design-system-react';
 import {
   Button,
@@ -38,7 +38,9 @@ function ViewContact({
   listRoute,
 }) {
   const t = useI18nContext();
-  const [copied, handleCopy] = useCopyToClipboard();
+
+  // useCopyToClipboard analysis: Copies public address of a contact
+  const [copied, handleCopy] = useCopyToClipboard({ clearDelayMs: null });
 
   if (!address) {
     return <Navigate to={{ pathname: listRoute }} />;
@@ -76,7 +78,7 @@ function ViewContact({
         </div>
         <div className="address-book__view-contact__group">
           <div className="address-book__view-contact__group__label">
-            {t('ethereumPublicAddress')}
+            {t('publicAddress')}
           </div>
           <div className="address-book__view-contact__group__value">
             <div

@@ -9,7 +9,7 @@ import {
   MetaMetricsEventName,
 } from '../../../../../shared/constants/metametrics';
 import { CHAIN_IDS } from '../../../../../shared/constants/network';
-import { renderWithProvider } from '../../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import { mockNetworkState } from '../../../../../test/stub/networks';
 import { MetaMetricsContext } from '../../../../contexts/metametrics';
 import { getDomainResolutions } from '../../../../ducks/domains';
@@ -173,6 +173,7 @@ describe('NameDetails', () => {
       name: null,
       hasPetname: false,
       displayState: TrustSignalDisplayState.Unknown,
+      isAccount: false,
     });
 
     useSelectorMock.mockImplementation((selector) => {
@@ -285,6 +286,7 @@ describe('NameDetails', () => {
       name: null,
       hasPetname: false,
       displayState: TrustSignalDisplayState.Unknown,
+      isAccount: false,
     });
 
     const { baseElement } = renderWithProvider(
@@ -305,6 +307,7 @@ describe('NameDetails', () => {
       name: SAVED_NAME_MOCK,
       hasPetname: true,
       displayState: TrustSignalDisplayState.Petname,
+      isAccount: false,
     });
 
     const { baseElement } = renderWithProvider(
@@ -325,6 +328,7 @@ describe('NameDetails', () => {
       name: 'iZUMi Bond USD',
       hasPetname: false,
       displayState: TrustSignalDisplayState.Recognized,
+      isAccount: false,
     });
 
     const { baseElement } = renderWithProvider(
@@ -345,6 +349,7 @@ describe('NameDetails', () => {
       name: SAVED_NAME_MOCK,
       hasPetname: true,
       displayState: TrustSignalDisplayState.Petname,
+      isAccount: false,
     });
 
     const component = renderWithProvider(
@@ -372,6 +377,7 @@ describe('NameDetails', () => {
       name: 'TestName',
       hasPetname: false,
       displayState: TrustSignalDisplayState.Unknown,
+      isAccount: false,
     });
 
     const component = renderWithProvider(
@@ -405,6 +411,7 @@ describe('NameDetails', () => {
       name: 'TestName',
       hasPetname: false,
       displayState: TrustSignalDisplayState.Unknown,
+      isAccount: false,
     });
 
     const component = renderWithProvider(
@@ -438,6 +445,7 @@ describe('NameDetails', () => {
       name: SAVED_NAME_MOCK,
       hasPetname: true,
       displayState: TrustSignalDisplayState.Petname,
+      isAccount: false,
     });
 
     const component = renderWithProvider(
@@ -467,6 +475,7 @@ describe('NameDetails', () => {
       name: SAVED_NAME_MOCK,
       hasPetname: true,
       displayState: TrustSignalDisplayState.Petname,
+      isAccount: false,
     });
 
     const component = renderWithProvider(
@@ -515,7 +524,7 @@ describe('NameDetails', () => {
     });
   });
 
-  it('updates proposed names on regular interval', () => {
+  it('updates proposed names on regular interval', async () => {
     renderWithProvider(
       <NameDetails
         type={NameType.ETHEREUM_ADDRESS}
@@ -527,12 +536,48 @@ describe('NameDetails', () => {
     );
 
     expect(updateProposedNamesMock).toHaveBeenCalledTimes(1);
-    jest.advanceTimersByTime(1999);
+    await act(async () => {
+      jest.advanceTimersByTime(1999);
+    });
     expect(updateProposedNamesMock).toHaveBeenCalledTimes(1);
-    jest.advanceTimersByTime(1);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
     expect(updateProposedNamesMock).toHaveBeenCalledTimes(2);
-    jest.advanceTimersByTime(2000);
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
     expect(updateProposedNamesMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not reset polling interval during rerenders', () => {
+    const nameDetails = (
+      <NameDetails
+        type={NameType.ETHEREUM_ADDRESS}
+        value={ADDRESS_NO_NAME_MOCK}
+        variation={VARIATION_MOCK}
+        onClose={() => undefined}
+      />
+    );
+
+    const component = renderWithProvider(nameDetails, store);
+
+    expect(updateProposedNamesMock).toHaveBeenCalledTimes(1);
+
+    // Simulate frequent rerenders (e.g. redux updates) before the polling delay elapses.
+    act(() => {
+      for (let index = 0; index < 50; index++) {
+        component.rerender(nameDetails);
+      }
+    });
+
+    expect(updateProposedNamesMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+
+    expect(updateProposedNamesMock).toHaveBeenCalledTimes(2);
   });
 
   describe('metrics', () => {
@@ -556,11 +601,19 @@ describe('NameDetails', () => {
         name: SAVED_NAME_MOCK,
         hasPetname: true,
         displayState: TrustSignalDisplayState.Petname,
+        isAccount: false,
       });
+
+      const mockMetaMetricsContext = {
+        trackEvent: trackEventMock,
+        bufferedTrace: jest.fn(),
+        bufferedEndTrace: jest.fn(),
+        onboardingParentContext: { current: null },
+      };
 
       await act(async () => {
         renderWithProvider(
-          <MetaMetricsContext.Provider value={trackEventMock}>
+          <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
             <NameDetails
               type={NameType.ETHEREUM_ADDRESS}
               value={ADDRESS_SAVED_NAME_MOCK}
@@ -638,12 +691,19 @@ describe('NameDetails', () => {
         name: null,
         hasPetname: false,
         displayState: TrustSignalDisplayState.Unknown,
+        isAccount: false,
       });
 
       const trackEventMock = jest.fn();
+      const mockMetaMetricsContext = {
+        trackEvent: trackEventMock,
+        bufferedTrace: jest.fn(),
+        bufferedEndTrace: jest.fn(),
+        onboardingParentContext: { current: null },
+      };
 
       const component = renderWithProvider(
-        <MetaMetricsContext.Provider value={trackEventMock}>
+        <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
           <NameDetails
             type={NameType.ETHEREUM_ADDRESS}
             value={ADDRESS_NO_NAME_MOCK}
@@ -741,12 +801,19 @@ describe('NameDetails', () => {
         name: SAVED_NAME_MOCK,
         hasPetname: true,
         displayState: TrustSignalDisplayState.Petname,
+        isAccount: false,
       });
 
       const trackEventMock = jest.fn();
+      const mockMetaMetricsContext = {
+        trackEvent: trackEventMock,
+        bufferedTrace: jest.fn(),
+        bufferedEndTrace: jest.fn(),
+        onboardingParentContext: { current: null },
+      };
 
       const component = renderWithProvider(
-        <MetaMetricsContext.Provider value={trackEventMock}>
+        <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
           <NameDetails
             type={NameType.ETHEREUM_ADDRESS}
             value={ADDRESS_SAVED_NAME_MOCK}
@@ -851,12 +918,19 @@ describe('NameDetails', () => {
         name: SAVED_NAME_MOCK,
         hasPetname: true,
         displayState: TrustSignalDisplayState.Petname,
+        isAccount: false,
       });
 
       const trackEventMock = jest.fn();
+      const mockMetaMetricsContext = {
+        trackEvent: trackEventMock,
+        bufferedTrace: jest.fn(),
+        bufferedEndTrace: jest.fn(),
+        onboardingParentContext: { current: null },
+      };
 
       const component = renderWithProvider(
-        <MetaMetricsContext.Provider value={trackEventMock}>
+        <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
           <NameDetails
             type={NameType.ETHEREUM_ADDRESS}
             value={ADDRESS_SAVED_NAME_MOCK}
@@ -893,6 +967,7 @@ describe('NameDetails', () => {
         name: null,
         hasPetname: false,
         displayState: TrustSignalDisplayState.Malicious,
+        isAccount: false,
       });
 
       const { getByText } = renderWithProvider(
@@ -913,6 +988,7 @@ describe('NameDetails', () => {
         name: null,
         hasPetname: false,
         displayState: TrustSignalDisplayState.Warning,
+        isAccount: false,
       });
 
       const { getByText } = renderWithProvider(
@@ -925,7 +1001,7 @@ describe('NameDetails', () => {
         store,
       );
 
-      expect(getByText('Address Needs Review')).toBeInTheDocument();
+      expect(getByText('Address needs review')).toBeInTheDocument();
     });
 
     it('renders verified state correctly', () => {
@@ -933,6 +1009,7 @@ describe('NameDetails', () => {
         name: 'Verified Contract',
         hasPetname: false,
         displayState: TrustSignalDisplayState.Verified,
+        isAccount: false,
       });
 
       const { getByText } = renderWithProvider(
@@ -953,6 +1030,7 @@ describe('NameDetails', () => {
         name: null,
         hasPetname: false,
         displayState: TrustSignalDisplayState.Malicious,
+        isAccount: false,
       });
 
       const { getByText } = renderWithProvider(
@@ -973,6 +1051,7 @@ describe('NameDetails', () => {
         name: null,
         hasPetname: false,
         displayState: TrustSignalDisplayState.Warning,
+        isAccount: false,
       });
 
       const { getByText } = renderWithProvider(

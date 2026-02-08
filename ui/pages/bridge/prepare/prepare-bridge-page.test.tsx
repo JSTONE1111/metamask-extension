@@ -1,20 +1,17 @@
 import React from 'react';
+import type { Provider } from '@metamask/network-controller';
 import { act } from '@testing-library/react';
-import * as reactRouterUtils from 'react-router-dom-v5-compat';
-import * as ReactReduxModule from 'react-redux';
+import { formatChainIdToCaip } from '@metamask/bridge-controller';
+import * as reactRouterUtils from 'react-router-dom';
 import { userEvent } from '@testing-library/user-event';
-import { toEvmCaipChainId } from '@metamask/multichain-network-controller';
-import { renderHook } from '@testing-library/react-hooks';
-import { fireEvent, renderWithProvider } from '../../../../test/jest';
+import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
+import { toAssetId } from '../../../../shared/lib/asset-utils';
 import configureStore from '../../../store/store';
 import { createBridgeMockStore } from '../../../../test/data/bridge/mock-bridge-store';
 import { CHAIN_IDS } from '../../../../shared/constants/network';
 import { createTestProviderTools } from '../../../../test/stub/provider';
-import * as SelectorsModule from '../../../selectors/multichain/networks';
-import * as ActionsModule from '../../../store/actions';
-import PrepareBridgePage, {
-  useEnableMissingNetwork,
-} from './prepare-bridge-page';
+import { setBackgroundConnection } from '../../../store/background-connection';
+import PrepareBridgePage from './prepare-bridge-page';
 
 // Mock the bridge hooks
 jest.mock('../hooks/useGasIncluded7702', () => ({
@@ -25,6 +22,12 @@ jest.mock('../hooks/useIsSendBundleSupported', () => ({
   useIsSendBundleSupported: jest.fn().mockReturnValue(false),
 }));
 
+setBackgroundConnection({
+  resetState: async () => jest.fn(),
+  getStatePatches: async () => jest.fn(),
+  updateBridgeQuoteRequestParams: async () => jest.fn(),
+} as never);
+
 describe('PrepareBridgePage', () => {
   beforeAll(() => {
     const { provider } = createTestProviderTools({
@@ -32,7 +35,7 @@ describe('PrepareBridgePage', () => {
       chainId: CHAIN_IDS.MAINNET,
     });
 
-    global.ethereumProvider = provider;
+    global.ethereumProvider = provider as unknown as Provider;
   });
 
   beforeEach(() => {
@@ -45,11 +48,11 @@ describe('PrepareBridgePage', () => {
       .mockReturnValue([{ get: () => null }] as never);
     const mockStore = createBridgeMockStore({
       featureFlagOverrides: {
-        extensionConfig: {
+        bridgeConfig: {
           chains: {
             [CHAIN_IDS.MAINNET]: {
               isActiveSrc: true,
-              isActiveDest: false,
+              isActiveDest: true,
             },
             [CHAIN_IDS.OPTIMISM]: {
               isActiveSrc: true,
@@ -81,12 +84,15 @@ describe('PrepareBridgePage', () => {
 
     expect(getByRole('button', { name: /ETH/u })).toBeInTheDocument();
 
-    expect(getByTestId('from-amount')).toBeInTheDocument();
-    expect(getByTestId('from-amount').closest('input')).not.toBeDisabled();
-    await act(() => {
-      fireEvent.change(getByTestId('from-amount'), { target: { value: '2' } });
+    const input = getByTestId('from-amount');
+    expect(input).toBeInTheDocument();
+    expect(input.closest('input')).not.toBeDisabled();
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      await userEvent.keyboard('2');
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue('2');
+    expect(input).toHaveDisplayValue('2');
 
     expect(getByTestId('to-amount')).toBeInTheDocument();
     expect(getByTestId('to-amount').closest('input')).toBeDisabled();
@@ -100,26 +106,22 @@ describe('PrepareBridgePage', () => {
       .mockReturnValue([{ get: () => '0x3103910' }, jest.fn()] as never);
     const mockStore = createBridgeMockStore({
       featureFlagOverrides: {
-        extensionConfig: {
+        bridgeConfig: {
           support: true,
           chains: {
             [CHAIN_IDS.MAINNET]: {
               isActiveSrc: true,
-              isActiveDest: false,
+              isActiveDest: true,
             },
             [CHAIN_IDS.LINEA_MAINNET]: {
               isActiveSrc: true,
               isActiveDest: true,
             },
           },
-        },
-        destTokens: {
-          '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984': {
-            iconUrl: 'http://url',
-            symbol: 'UNI',
-            address: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
-            decimals: 6,
-          },
+          chainRanking: [
+            { chainId: formatChainIdToCaip(CHAIN_IDS.MAINNET) },
+            { chainId: formatChainIdToCaip(CHAIN_IDS.LINEA_MAINNET) },
+          ],
         },
       },
       bridgeSliceOverrides: {
@@ -127,15 +129,23 @@ describe('PrepareBridgePage', () => {
         fromToken: {
           address: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
           decimals: 6,
-          chainId: CHAIN_IDS.MAINNET,
+          chainId: formatChainIdToCaip(CHAIN_IDS.MAINNET),
+          assetId: toAssetId(
+            '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
+            formatChainIdToCaip(CHAIN_IDS.MAINNET),
+          ),
         },
         toToken: {
           iconUrl: 'http://url',
           symbol: 'UNI',
           address: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
           decimals: 6,
+          chainId: formatChainIdToCaip(CHAIN_IDS.LINEA_MAINNET),
+          assetId: toAssetId(
+            '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
+            formatChainIdToCaip(CHAIN_IDS.LINEA_MAINNET),
+          ),
         },
-        toChainId: toEvmCaipChainId(CHAIN_IDS.LINEA_MAINNET),
       },
       bridgeStateOverrides: {
         quoteRequest: {
@@ -161,15 +171,20 @@ describe('PrepareBridgePage', () => {
     expect(getByTestId('from-amount')).toBeInTheDocument();
     expect(getByTestId('from-amount').closest('input')).not.toBeDisabled();
 
-    await act(() => {
-      fireEvent.change(getByTestId('from-amount'), { target: { value: '1' } });
+    const input = getByTestId('from-amount');
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      await userEvent.keyboard('1');
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue('1');
+    expect(input).toHaveDisplayValue('1');
 
-    await act(() => {
-      fireEvent.change(getByTestId('from-amount'), { target: { value: '2' } });
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      await userEvent.keyboard('2');
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue('2');
+    expect(input).toHaveDisplayValue('2');
 
     expect(getByTestId('to-amount')).toBeInTheDocument();
     expect(getByTestId('to-amount').closest('input')).toBeDisabled();
@@ -180,7 +195,7 @@ describe('PrepareBridgePage', () => {
   it('should throw an error if token decimals are not defined', async () => {
     const mockStore = createBridgeMockStore({
       featureFlagOverrides: {
-        extensionConfig: {
+        bridgeConfig: {
           chains: {
             [CHAIN_IDS.MAINNET]: {
               isActiveSrc: true,
@@ -201,8 +216,8 @@ describe('PrepareBridgePage', () => {
           symbol: 'UNI',
           address: '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984',
           decimals: 6,
+          chainId: CHAIN_IDS.LINEA_MAINNET,
         },
-        toChainId: toEvmCaipChainId(CHAIN_IDS.LINEA_MAINNET),
       },
     });
 
@@ -220,11 +235,11 @@ describe('PrepareBridgePage', () => {
       .mockReturnValue([{ get: () => null }] as never);
     const mockStore = createBridgeMockStore({
       featureFlagOverrides: {
-        extensionConfig: {
+        bridgeConfig: {
           chains: {
             [CHAIN_IDS.MAINNET]: {
               isActiveSrc: true,
-              isActiveDest: false,
+              isActiveDest: true,
             },
           },
         },
@@ -237,103 +252,55 @@ describe('PrepareBridgePage', () => {
 
     expect(getByTestId('from-amount').closest('input')).not.toBeDisabled();
 
-    act(() => {
-      fireEvent.change(getByTestId('from-amount'), {
-        target: { value: '2abc.123456123456123456' },
-      });
+    const input = getByTestId('from-amount');
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      for (const char of '2abc.123456123456123456') {
+        await userEvent.keyboard(char);
+      }
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue(
-      '2.123456123456123456',
-    );
+    expect(input).toHaveDisplayValue('2.123456123456123456');
 
-    act(() => {
-      fireEvent.change(getByTestId('from-amount'), {
-        target: { value: '2abc,131.1212' },
-      });
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      for (const char of '2abc,131.1212') {
+        await userEvent.keyboard(char);
+      }
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue(
-      '2131.1212',
-    );
+    expect(input).toHaveDisplayValue('2131.1212');
 
-    act(() => {
-      fireEvent.change(getByTestId('from-amount'), {
-        target: { value: '2abc,131.123456123456123456123456' },
-      });
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      for (const char of '2abc,131.123456123456123456123456') {
+        await userEvent.keyboard(char);
+      }
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue(
-      '2131.123456123456123456123456',
-    );
+    expect(input).toHaveDisplayValue('2131.123456123456123456123456');
 
-    act(() => {
-      fireEvent.change(getByTestId('from-amount'), {
-        target: { value: '2abc.131.123456123456123456123456' },
-      });
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      await userEvent.paste('2abc,131.123456123456123456123456');
     });
-    expect(getByTestId('from-amount').closest('input')).toHaveValue('2.131');
+    expect(input).toHaveDisplayValue('2131.123456123456123456123456');
 
-    userEvent.paste('2abc.131.123456123456123456123456');
-    expect(getByTestId('from-amount').closest('input')).toHaveValue('2.131');
-  });
-});
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      for (const char of '2abc.131.123456123456123456123456') {
+        await userEvent.keyboard(char);
+      }
+    });
+    expect(input).toHaveDisplayValue('2.131123456123456123456123456');
 
-describe('useEnableMissingNetwork', () => {
-  const arrangeReactReduxMocks = () => {
-    jest
-      .spyOn(ReactReduxModule, 'useSelector')
-      .mockImplementation((selector) => selector({}));
-    jest.spyOn(ReactReduxModule, 'useDispatch').mockReturnValue(jest.fn());
-  };
-
-  const arrange = () => {
-    arrangeReactReduxMocks();
-
-    const mockGetEnabledNetworksByNamespace = jest
-      .spyOn(SelectorsModule, 'getEnabledNetworksByNamespace')
-      .mockReturnValue({
-        '0x1': true,
-        '0xe708': true,
-      });
-    const mockEnableAllPopularNetworks = jest.spyOn(
-      ActionsModule,
-      'setEnabledAllPopularNetworks',
-    );
-
-    return {
-      mockGetEnabledNetworksByNamespace,
-      mockEnableAllPopularNetworks,
-    };
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('enables popular network when not already enabled', () => {
-    const mocks = arrange();
-    mocks.mockGetEnabledNetworksByNamespace.mockReturnValue({ '0xe708': true }); // Missing 0x1.
-    const hook = renderHook(() => useEnableMissingNetwork());
-
-    // Act - enable 0x1
-    hook.result.current('0x1');
-
-    // Assert - Adds 0x1 to enabled networks
-    expect(mocks.mockEnableAllPopularNetworks).toHaveBeenCalledWith();
-  });
-
-  it('does not enable popular network if already enabled', () => {
-    const mocks = arrange();
-    const hook = renderHook(() => useEnableMissingNetwork());
-
-    // Act - enable 0x1 (already enabled)
-    hook.result.current('0x1');
-    expect(mocks.mockEnableAllPopularNetworks).not.toHaveBeenCalled();
-  });
-
-  it('does not enable non-popular network', () => {
-    const mocks = arrange();
-    const hook = renderHook(() => useEnableMissingNetwork());
-
-    hook.result.current('0x1111'); // not popular network
-    expect(mocks.mockEnableAllPopularNetworks).not.toHaveBeenCalled();
+    await act(async () => {
+      input.focus();
+      await userEvent.clear(input);
+      await userEvent.paste('2abc.131.123456123456123456123456');
+    });
+    expect(input).toHaveDisplayValue('2.131');
   });
 });

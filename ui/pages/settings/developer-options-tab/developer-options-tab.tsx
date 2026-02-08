@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom-v5-compat';
+import { useNavigate } from 'react-router-dom';
 
 import {
   Box,
@@ -36,9 +36,11 @@ import {
 import { getEnvironmentType } from '../../../../app/scripts/lib/util';
 import { ENVIRONMENT_TYPE_POPUP } from '../../../../shared/constants/app';
 import { getRemoteFeatureFlags } from '../../../selectors';
+import { ConfirmationsDeveloperOptions } from '../../confirmations/components/developer/confirmations-developer-options';
 import ToggleRow from './developer-options-toggle-row-component';
 import SentryTest from './sentry-test';
 import { BackupAndSyncDevSettings } from './backup-and-sync';
+import MigrateToSplitStateTest from './migrate-to-split-state-test';
 
 /**
  * Settings Page for Developer Options (internal-only)
@@ -164,7 +166,7 @@ const DeveloperOptionsTab = () => {
           <span>Onboarding</span>
           <div className="settings-page__content-description">
             Resets various states related to onboarding and redirects to the
-            "Secure Your Wallet" onboarding page.
+            &quot;Secure Your Wallet&quot; onboarding page.
           </div>
         </div>
 
@@ -277,6 +279,10 @@ const DeveloperOptionsTab = () => {
 
       <BackupAndSyncDevSettings />
       <SentryTest />
+      <hr />
+      <MigrateToSplitStateTest />
+      <hr />
+      <ConfirmationsDeveloperOptions />
     </div>
   );
 };

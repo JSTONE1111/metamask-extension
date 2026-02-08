@@ -1,7 +1,8 @@
 import React from 'react';
 import { screen } from '@testing-library/react';
+import { CHAIN_IDS } from '../../../../../shared/constants/network';
 import { mockNetworkState } from '../../../../../test/stub/networks';
-import { renderWithProvider } from '../../../../../test/jest';
+import { renderWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import configureStore from '../../../../store/store';
 import SnapPermissionsList from './snap-permissions-list';
 
@@ -44,7 +45,7 @@ describe('Snap Permission List', () => {
           },
         },
       },
-      ...mockNetworkState({}),
+      ...mockNetworkState({ chainId: CHAIN_IDS.MAINNET }),
     },
   };
 

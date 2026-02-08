@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTokenDisplayInfo } from '../hooks';
 import {
   ButtonSecondary,
@@ -32,7 +32,6 @@ import {
 export type TokenCellProps = {
   token: TokenWithFiatAmount;
   privacyMode?: boolean;
-  disableHover?: boolean;
   onClick?: () => void;
   fixCurrencyToUSD?: boolean;
   safeChains?: SafeChain[];
@@ -44,12 +43,11 @@ export default function TokenCell({
   token,
   privacyMode = false,
   onClick,
-  disableHover = false,
   fixCurrencyToUSD = false,
   safeChains,
 }: TokenCellProps) {
   const dispatch = useDispatch();
-  const history = useHistory();
+  const navigate = useNavigate();
   const t = useI18nContext();
   const isEvm = isEvmChainId(token.chainId);
   const nativeCurrencySymbol = useMemo(
@@ -83,8 +81,15 @@ export default function TokenCell({
     <>
       <GenericAssetCellLayout
         onClick={showScamWarningModal ? undefined : onClick}
-        disableHover={disableHover}
-        badge={<AssetCellBadge {...displayToken} />}
+        badge={
+          <AssetCellBadge
+            chainId={token.chainId}
+            isNative={token.isNative}
+            tokenImage={displayToken.tokenImage}
+            symbol={token.symbol}
+            assetId={token.assetId}
+          />
+        }
         headerLeftDisplay={<TokenCellTitle token={displayToken} />}
         headerRightDisplay={
           <TokenCellSecondaryDisplay
@@ -119,7 +124,7 @@ export default function TokenCell({
               <ButtonSecondary
                 onClick={() => {
                   dispatch(setEditedNetwork({ chainId: token.chainId }));
-                  history.push(NETWORKS_ROUTE);
+                  navigate(NETWORKS_ROUTE);
                 }}
                 block
               >

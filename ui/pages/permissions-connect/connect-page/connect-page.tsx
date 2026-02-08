@@ -23,10 +23,7 @@ import {
 
 import { isEqual } from 'lodash';
 import { Tooltip } from 'react-tippy';
-import {
-  BoxBackgroundColor,
-  BoxJustifyContent,
-} from '@metamask/design-system-react';
+
 import { useI18nContext } from '../../../hooks/useI18nContext';
 import {
   getPermissions,
@@ -68,7 +65,7 @@ import {
   TextColor,
   TextVariant,
 } from '../../../helpers/constants/design-system';
-import { CAIP_FORMATTED_EVM_TEST_CHAINS } from '../../../../shared/constants/network';
+import { CAIP_FORMATTED_TEST_CHAINS } from '../../../../shared/constants/network';
 import { getMultichainNetwork } from '../../../selectors/multichain';
 import { Tab, Tabs } from '../../../components/ui/tabs';
 import {
@@ -132,7 +129,8 @@ export const ConnectPage: React.FC<ConnectPageProps> = ({
   targetSubjectMetadata,
 }) => {
   const t = useI18nContext();
-  const trackEvent = useContext(MetaMetricsContext);
+  const { trackEvent } = useContext(MetaMetricsContext);
+  const [activeTab, setActiveTab] = useState('accounts');
 
   const existingPermissions = useSelector((state) =>
     getPermissions(state, request.metadata?.origin),
@@ -179,7 +177,7 @@ export const ConnectPage: React.FC<ConnectPageProps> = ({
         ([nonTestNetworksList, testNetworksList], [chainId, network]) => {
           const caipChainId = chainId as CaipChainId;
           const isTestNetwork =
-            CAIP_FORMATTED_EVM_TEST_CHAINS.includes(caipChainId);
+            CAIP_FORMATTED_TEST_CHAINS.includes(caipChainId);
           (isTestNetwork ? testNetworksList : nonTestNetworksList).push({
             ...network,
             caipChainId,
@@ -462,35 +460,19 @@ export const ConnectPage: React.FC<ConnectPageProps> = ({
       className="main-container connect-page"
       backgroundColor={BackgroundColor.backgroundDefault}
     >
-      <Header paddingTop={8} paddingBottom={0}>
+      <Header paddingTop={8} paddingBottom={4}>
         <Box
           display={Display.Flex}
           justifyContent={JustifyContent.center}
           marginBottom={8}
         >
           {targetSubjectMetadata.iconUrl ? (
-            <>
-              <Box
-                style={{
-                  filter: 'blur(16px) brightness(1.1)',
-                  position: 'absolute',
-                }}
-              >
-                <AvatarFavicon
-                  backgroundColor={BackgroundColor.backgroundMuted}
-                  size={AvatarFaviconSize.Xl}
-                  src={targetSubjectMetadata.iconUrl}
-                  name={title}
-                />
-              </Box>
-              <AvatarFavicon
-                backgroundColor={BackgroundColor.backgroundMuted}
-                size={AvatarFaviconSize.Lg}
-                src={targetSubjectMetadata.iconUrl}
-                name={title}
-                style={{ zIndex: 1, background: 'transparent' }}
-              />
-            </>
+            <AvatarFavicon
+              backgroundColor={BackgroundColor.backgroundMuted}
+              size={AvatarFaviconSize.Lg}
+              src={targetSubjectMetadata.iconUrl}
+              name={title}
+            />
           ) : (
             <AvatarBase
               size={AvatarBaseSize.Lg}
@@ -546,19 +528,12 @@ export const ConnectPage: React.FC<ConnectPageProps> = ({
         paddingRight={4}
         backgroundColor={BackgroundColor.transparent}
       >
-        <Tabs
-          onTabClick={() => null}
-          backgroundColor={BoxBackgroundColor.Transparent}
-          justifyContent={BoxJustifyContent.Center}
-          defaultActiveTabKey="accounts"
-          tabListProps={{
-            backgroundColor: BoxBackgroundColor.Transparent,
-          }}
-        >
+        <Tabs activeTab={activeTab} onTabClick={setActiveTab}>
           <Tab
             name={t('accounts')}
             tabKey="accounts"
             data-testid="accounts-tab"
+            className="flex-1"
           >
             <Box marginTop={4}>
               <Box
@@ -663,6 +638,7 @@ export const ConnectPage: React.FC<ConnectPageProps> = ({
               !solanaAccountExistsInWallet &&
               selectedAccounts.length === 0
             }
+            className="flex-1"
           >
             <Box marginTop={4}>
               <SiteCell

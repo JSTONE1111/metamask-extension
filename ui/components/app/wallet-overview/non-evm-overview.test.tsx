@@ -7,7 +7,7 @@ import { BtcAccountType, BtcMethod, BtcScope } from '@metamask/keyring-api';
 import { AVAILABLE_MULTICHAIN_NETWORK_CONFIGURATIONS } from '@metamask/multichain-network-controller';
 import { MultichainNativeAssets } from '../../../../shared/constants/multichain/assets';
 import mockState from '../../../../test/data/mock-state.json';
-import { renderWithProvider } from '../../../../test/jest/rendering';
+import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { MultichainNetworks } from '../../../../shared/constants/multichain/networks';
 import { defaultBuyableChains } from '../../../ducks/ramps/constants';
 import { MetaMetricsContext } from '../../../contexts/metametrics';
@@ -19,17 +19,21 @@ import useMultiPolling from '../../../hooks/useMultiPolling';
 import { BITCOIN_WALLET_SNAP_ID } from '../../../../shared/lib/accounts/bitcoin-wallet-snap';
 import NonEvmOverview from './non-evm-overview';
 
-// We need to mock `dispatch` since we use it for `setDefaultHomeActiveTabName`.
-const mockDispatch = jest.fn().mockReturnValue(() => jest.fn());
-jest.mock('react-redux', () => ({
-  ...jest.requireActual('react-redux'),
-  useDispatch: () => mockDispatch,
-}));
+// TODO: Remove this mock when multichain accounts feature flag is entirely removed.
+// TODO: Convert any old tests (UI/UX state 1) to its state 2 equivalent (if possible).
+jest.mock(
+  '../../../../shared/lib/multichain-accounts/remote-feature-flag',
+  () => ({
+    ...jest.requireActual(
+      '../../../../shared/lib/multichain-accounts/remote-feature-flag',
+    ),
+    isMultichainAccountsFeatureEnabled: () => false,
+  }),
+);
 
 jest.mock('../../../store/actions', () => ({
   handleSnapRequest: jest.fn(),
   sendMultichainTransaction: jest.fn(),
-  setDefaultHomeActiveTabName: jest.fn(),
   tokenBalancesStartPolling: jest.fn().mockResolvedValue('pollingToken'),
   tokenBalancesStopPollingByPollingToken: jest.fn(),
 }));
@@ -49,12 +53,19 @@ jest.mock('../../../hooks/ramps/useRamps/useRamps', () => ({
   default: jest.fn(() => ({
     openBuyCryptoInPdapp: mockOpenBuyCryptoInPdapp,
   })),
+  RampsMetaMaskEntry: {
+    BuySellButton: 'ext_buy_sell_button',
+    NftBanner: 'ext_buy_banner_nfts',
+    TokensBanner: 'ext_buy_banner_tokens',
+    ActivityBanner: 'ext_buy_banner_activity',
+    BtcBanner: 'ext_buy_banner_btc',
+  },
 }));
 
 const BUY_BUTTON = 'coin-overview-buy';
 const BTC_OVERVIEW_BRIDGE = 'coin-overview-bridge';
 const BTC_OVERVIEW_RECEIVE = 'coin-overview-receive';
-const BTC_OVERVIEW_SWAP = 'token-overview-button-swap';
+const BTC_OVERVIEW_SWAP = 'coin-overview-swap';
 const BTC_OVERVIEW_SEND = 'coin-overview-send';
 const BTC_OVERVIEW_PRIMARY_CURRENCY = 'coin-overview__primary-currency';
 
@@ -108,7 +119,7 @@ const mockBuyableChainsEvmOnly = defaultBuyableChains.filter(
 const mockMetamaskStore = {
   ...mockState.metamask,
   remoteFeatureFlags: {
-    addBitcoinAccount: true,
+    bitcoinAccounts: { enabled: true, minimumVersion: '13.6.0' },
     bridgeConfig: {
       support: true,
     },
@@ -351,8 +362,14 @@ describe('NonEvmOverview', () => {
     });
 
     const mockTrackEvent = jest.fn();
+    const mockMetaMetricsContext = {
+      trackEvent: mockTrackEvent,
+      bufferedTrace: jest.fn(),
+      bufferedEndTrace: jest.fn(),
+      onboardingParentContext: { current: null },
+    };
     const { queryByTestId } = renderWithProvider(
-      <MetaMetricsContext.Provider value={mockTrackEvent}>
+      <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
         <NonEvmOverview />
       </MetaMetricsContext.Provider>,
       storeWithBtcBuyable,
@@ -408,8 +425,14 @@ describe('NonEvmOverview', () => {
 
   it('sends an event when clicking the Send button', () => {
     const mockTrackEvent = jest.fn();
+    const mockMetaMetricsContext = {
+      trackEvent: mockTrackEvent,
+      bufferedTrace: jest.fn(),
+      bufferedEndTrace: jest.fn(),
+      onboardingParentContext: { current: null },
+    };
     const { queryByTestId } = renderWithProvider(
-      <MetaMetricsContext.Provider value={mockTrackEvent}>
+      <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
         <NonEvmOverview />
       </MetaMetricsContext.Provider>,
       getStore(),
@@ -446,7 +469,7 @@ describe('NonEvmOverview', () => {
     );
   });
 
-  it('disables the Send and Bridge buttons if external services are disabled', () => {
+  it('does not disable the Send button when external services are disabled (filtering happens upstream)', () => {
     const { queryByTestId } = renderWithProvider(
       <NonEvmOverview />,
       getStore({
@@ -460,7 +483,8 @@ describe('NonEvmOverview', () => {
     const sendButton = queryByTestId(BTC_OVERVIEW_SEND);
     const bridgeButton = queryByTestId(BTC_OVERVIEW_BRIDGE);
     expect(sendButton).toBeInTheDocument();
-    expect(sendButton).toBeDisabled();
+    // Send button is no longer disabled - non-EVM filtering happens upstream in token/network lists
+    expect(sendButton).not.toBeDisabled();
     expect(bridgeButton).not.toBeInTheDocument();
   });
 });

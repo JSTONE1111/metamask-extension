@@ -3,10 +3,7 @@ import {
   TransactionType,
 } from '@metamask/transaction-controller';
 import React, { useCallback } from 'react';
-import { useDispatch } from 'react-redux';
-import { useHistory } from 'react-router-dom';
-
-import { AssetType } from '../../../../../../shared/constants/transaction';
+import { useNavigate } from 'react-router-dom';
 import { MetaMetricsEventLocation } from '../../../../../../shared/constants/metametrics';
 import {
   Box,
@@ -15,8 +12,6 @@ import {
   IconName,
   Text,
 } from '../../../../../components/component-library';
-import { clearConfirmTransaction } from '../../../../../ducks/confirm-transaction/confirm-transaction.duck';
-import { editExistingTransaction } from '../../../../../ducks/send';
 import {
   AlignItems,
   BackgroundColor,
@@ -27,24 +22,26 @@ import {
   TextColor,
   TextVariant,
 } from '../../../../../helpers/constants/design-system';
+import { SHIELD_PLAN_ROUTE } from '../../../../../helpers/constants/routes';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
-import { showSendTokenPage } from '../../../../../store/actions';
-import { useConfirmActions } from '../../../hooks/useConfirmActions';
 import { useConfirmContext } from '../../../context/confirm';
-import { navigateToSendRoute } from '../../../utils/send';
-import { useRedesignedSendFlow } from '../../../hooks/useRedesignedSendFlow';
+import { useConfirmActions } from '../../../hooks/useConfirmActions';
 import { AdvancedDetailsButton } from './advanced-details-button';
 
 export const WalletInitiatedHeader = () => {
   const t = useI18nContext();
-  const dispatch = useDispatch();
-  const history = useHistory();
-  const { enabled: isSendRedesignEnabled } = useRedesignedSendFlow();
   const { onCancel } = useConfirmActions();
   const { currentConfirmation } = useConfirmContext<TransactionMeta>();
+  const navigate = useNavigate();
 
-  const handleBackButtonClick = useCallback(async () => {
-    const { id } = currentConfirmation;
+  const handleBackButtonClick = useCallback(() => {
+    if (
+      currentConfirmation.type === TransactionType.shieldSubscriptionApprove
+    ) {
+      onCancel({ location: MetaMetricsEventLocation.Confirmation });
+      navigate(SHIELD_PLAN_ROUTE);
+      return;
+    }
 
     const isNativeSend =
       currentConfirmation.type === TransactionType.simpleSend;
@@ -54,33 +51,13 @@ export const WalletInitiatedHeader = () => {
       currentConfirmation.type === TransactionType.tokenMethodTransferFrom ||
       currentConfirmation.type === TransactionType.tokenMethodSafeTransferFrom;
 
-    if (
-      isSendRedesignEnabled &&
-      (isNativeSend || isERC20TokenSend || isNFTTokenSend)
-    ) {
+    if (isNativeSend || isERC20TokenSend || isNFTTokenSend) {
       onCancel({
         location: MetaMetricsEventLocation.Confirmation,
         navigateBackForSend: true,
       });
-      return;
     }
-
-    let assetType: AssetType;
-    if (isNativeSend) {
-      assetType = AssetType.native;
-    } else if (isERC20TokenSend) {
-      assetType = AssetType.token;
-    } else if (isNFTTokenSend) {
-      assetType = AssetType.NFT;
-    } else {
-      assetType = AssetType.unknown;
-    }
-
-    await dispatch(editExistingTransaction(assetType, id.toString()));
-    dispatch(clearConfirmTransaction());
-    dispatch(showSendTokenPage());
-    navigateToSendRoute(history, isSendRedesignEnabled);
-  }, [currentConfirmation, dispatch, history, isSendRedesignEnabled, onCancel]);
+  }, [currentConfirmation, navigate, onCancel]);
 
   return (
     <Box
@@ -105,7 +82,9 @@ export const WalletInitiatedHeader = () => {
         color={IconColor.iconDefault}
       />
       <Text variant={TextVariant.headingSm} color={TextColor.inherit}>
-        {t('review')}
+        {currentConfirmation.type === TransactionType.shieldSubscriptionApprove
+          ? t('shieldConfirmMembership')
+          : t('review')}
       </Text>
       <AdvancedDetailsButton />
     </Box>

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ERC721 } from '@metamask/controller-utils';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ERC721, ERC1155 } from '@metamask/controller-utils';
 
 import {
   Box,
@@ -20,7 +20,6 @@ import {
 } from '../../../../../helpers/constants/design-system';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useAmountSelectionMetrics } from '../../../hooks/send/metrics/useAmountSelectionMetrics';
-import { useAmountValidation } from '../../../hooks/send/useAmountValidation';
 import { useBalance } from '../../../hooks/send/useBalance';
 import { useCurrencyConversions } from '../../../hooks/send/useCurrencyConversions';
 import { useMaxAmount } from '../../../hooks/send/useMaxAmount';
@@ -33,18 +32,18 @@ import {
 } from '../../../utils/send';
 
 export const Amount = ({
-  setAmountValueError,
+  amountError,
 }: {
-  setAmountValueError: (str?: string) => void;
+  amountError: string | undefined;
 }) => {
   const t = useI18nContext();
   const { asset, updateValue, value } = useSendContext();
   const [amount, setAmount] = useState(value ?? '');
-  const [amountValueError, setAmountValueErrorLocal] = useState<string>();
   const { balance } = useBalance();
   const [fiatMode, setFiatMode] = useState(false);
   const {
     conversionSupportedForAsset,
+    fiatCurrencyName,
     getFiatValue,
     getFiatDisplayValue,
     getNativeValue,
@@ -65,25 +64,17 @@ export const Amount = ({
         : getFiatDisplayValue(amount),
     [amount, fiatMode, getFiatDisplayValue, value],
   );
-  const { amountError } = useAmountValidation();
-
-  useEffect(() => {
-    let amtError: string | undefined;
-    if (amountError) {
-      amtError = amountError;
-    } else if (amount === undefined || amount === null || amount === '') {
-      amtError = undefined;
-    } else if (!isValidPositiveNumericString(amount)) {
-      amtError = t('invalidValue');
-    }
-    setAmountValueError(amtError);
-    setAmountValueErrorLocal(amtError);
-  }, [amount, amountError, setAmountValueError, setAmountValueErrorLocal, t]);
 
   const onChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const newValue = event.target.value;
       const fractionSize = getFractionLength(newValue);
+
+      const numericRegex = /^\d*\.?\d*$/u;
+      if (!numericRegex.test(newValue)) {
+        return;
+      }
+
       if (
         (fiatMode && fractionSize > 2) ||
         (!fiatMode && fractionSize > (asset?.decimals ?? 0))
@@ -136,6 +127,29 @@ export const Amount = ({
     updateValue,
   ]);
 
+  const balanceDisplayValue = useMemo(() => {
+    if (fiatMode) {
+      return `${getFiatDisplayValue(String(balance))} ${t('available')}`;
+    }
+
+    // For ERC1155 tokens, use name or just show balance without symbol
+    if (asset?.standard === ERC1155) {
+      const displayName = asset?.name ? ` ${asset.name}` : '';
+      return `${balance}${displayName} ${t('available')}`;
+    }
+
+    // For other tokens, use symbol
+    return `${balance} ${asset?.symbol} ${t('available')}`;
+  }, [
+    fiatMode,
+    getFiatDisplayValue,
+    balance,
+    asset?.symbol,
+    asset?.name,
+    asset?.standard,
+    t,
+  ]);
+
   if (asset?.standard === ERC721) {
     return null;
   }
@@ -146,15 +160,18 @@ export const Amount = ({
         {t('amount')}
       </Text>
       <TextField
-        error={Boolean(amountValueError)}
+        error={Boolean(amountError)}
         onChange={onChange}
         onPaste={setAmountInputMethodPasted}
         onInput={setAmountInputMethodManual}
         placeholder="0"
+        testId="send-amount-input"
         value={amount}
         endAccessory={
           <Box display={Display.Flex}>
-            <Text>{asset?.symbol}</Text>
+            <Text>
+              {fiatMode ? fiatCurrencyName?.toUpperCase() : asset?.symbol}
+            </Text>
             {conversionSupportedForAsset && (
               <ButtonIcon
                 ariaLabel="toggle fiat mode"
@@ -177,18 +194,16 @@ export const Amount = ({
       >
         <Text
           color={
-            amountValueError
-              ? TextColor.errorDefault
-              : TextColor.textAlternative
+            amountError ? TextColor.errorDefault : TextColor.textAlternative
           }
           variant={TextVariant.bodySm}
         >
-          {amountValueError ||
+          {amountError ||
             (conversionSupportedForAsset ? alternateDisplayValue : '')}
         </Text>
         <Box display={Display.Flex}>
           <Text color={TextColor.textAlternative} variant={TextVariant.bodySm}>
-            {balance} {asset?.symbol} {t('available')}
+            {balanceDisplayValue}
           </Text>
           {!isNonEvmNativeSendType && (
             <ButtonLink

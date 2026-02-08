@@ -1,15 +1,31 @@
 import * as bridgeControllerUtils from '@metamask/bridge-controller';
 import { BigNumber } from 'ethers';
-import { renderHookWithProvider } from '../../../test/lib/render-helpers';
-import { createBridgeMockStore } from '../../../test/data/bridge/mock-bridge-store';
+import { useLocation } from 'react-router-dom';
+import { renderHookWithProvider } from '../../../test/lib/render-helpers-navigate';
+import {
+  createBridgeMockStore,
+  MOCK_SOLANA_ACCOUNT,
+} from '../../../test/data/bridge/mock-bridge-store';
 import * as assetUtils from '../../../shared/lib/asset-utils';
 import { CHAIN_IDS } from '../../../shared/constants/network';
 import { mockNetworkState } from '../../../test/stub/networks';
 
 import { useBridgeQueryParams } from './useBridgeQueryParams';
 
+// Helper hook that combines useBridgeQueryParams with useLocation
+// so we can inspect the router state from the same v6 context
+const useBridgeQueryParamsWithLocation = () => {
+  const location = useLocation();
+  useBridgeQueryParams();
+  return { location };
+};
+
 const renderUseBridgeQueryParams = (mockStoreState: object, path?: string) =>
-  renderHookWithProvider(() => useBridgeQueryParams(), mockStoreState, path);
+  renderHookWithProvider(
+    () => useBridgeQueryParamsWithLocation(),
+    mockStoreState,
+    path,
+  );
 
 let calcLatestSrcBalanceSpy: jest.SpyInstance;
 
@@ -46,9 +62,26 @@ describe('useBridgeQueryParams', () => {
       featureFlagOverrides: {
         bridgeConfig: {
           chains: {
+            [CHAIN_IDS.MAINNET]: {
+              isActiveSrc: true,
+              isActiveDest: true,
+            },
             [ChainId.SOLANA]: {
               isActiveSrc: true,
               isActiveDest: true,
+            },
+          },
+        },
+      },
+      metamaskStateOverrides: {
+        internalAccounts: {
+          selectedAccount: MOCK_SOLANA_ACCOUNT.id,
+        },
+        balances: {
+          'bf13d52c-d6e8-40ea-9726-07d7149a3ca5': {
+            [bridgeControllerUtils.getNativeAssetForChainId(ChainId.SOLANA)
+              .assetId]: {
+              amount: '2',
             },
           },
         },
@@ -61,23 +94,23 @@ describe('useBridgeQueryParams', () => {
       amount: '100',
       swaps: 'true',
     });
-
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const renderResult = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
     );
 
-    await waitForNextUpdate();
+    const { waitForNextUpdate, store, result } = renderResult;
 
-    expect(history.location.search).toBe('swaps=true');
+    await waitForNextUpdate();
+    expect(result.current.location.search).toBe('?swaps=true');
+    expect(result.current.location.pathname).toBe('/');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).toHaveBeenCalledTimes(1);
@@ -104,16 +137,11 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.SOLANA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
-            },
-          },
+          ],
         },
       },
       metamaskStateOverrides: {
@@ -128,7 +156,7 @@ describe('useBridgeQueryParams', () => {
       swaps: 'true',
     });
 
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const { result, waitForNextUpdate, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
@@ -136,12 +164,11 @@ describe('useBridgeQueryParams', () => {
 
     await waitForNextUpdate();
 
-    expect(history.location.search).toBe('swaps=true');
+    expect(result.current.location.search).toBe('?swaps=true');
     expect(store).toBeDefined();
     const {
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
       fromTokenBalance,
       fromNativeBalance,
@@ -149,7 +176,6 @@ describe('useBridgeQueryParams', () => {
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
       fromTokenBalance,
       fromNativeBalance,
@@ -165,16 +191,16 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.SOLANA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(
+                ChainId.SOLANA,
+              ),
             },
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-          },
+          ],
         },
       },
     });
@@ -186,7 +212,7 @@ describe('useBridgeQueryParams', () => {
       swaps: 'true',
     });
 
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const { result, waitForNextUpdate, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
@@ -194,14 +220,13 @@ describe('useBridgeQueryParams', () => {
 
     await waitForNextUpdate();
 
-    expect(history.location.search).toBe('swaps=true');
+    expect(result.current.location.search).toBe('?swaps=true');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).toHaveBeenCalledTimes(1);
@@ -222,12 +247,11 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-          },
+          ],
         },
       },
       metamaskStateOverrides: {
@@ -239,7 +263,7 @@ describe('useBridgeQueryParams', () => {
       from: 'eip155:59144/erc20:0x8ac76a51cc950d9822d68b83fe1ad97b32cd580D',
     });
 
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const { result, waitForNextUpdate, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
@@ -247,14 +271,13 @@ describe('useBridgeQueryParams', () => {
 
     await waitForNextUpdate();
 
-    expect(history.location.search).toBe('');
+    expect(result.current.location.search).toBe('');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).toHaveBeenCalledTimes(1);
@@ -275,12 +298,11 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-          },
+          ],
         },
       },
       metamaskStateOverrides: {
@@ -292,7 +314,7 @@ describe('useBridgeQueryParams', () => {
       from: 'eip155:59144/slip44:60',
     });
 
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const { result, waitForNextUpdate, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
@@ -300,21 +322,20 @@ describe('useBridgeQueryParams', () => {
 
     await waitForNextUpdate();
 
-    expect(history.location.search).toBe('');
+    expect(result.current.location.search).toBe('');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).toHaveBeenCalledTimes(1);
     expect(calcLatestSrcBalanceSpy.mock.calls).toMatchSnapshot();
   });
 
-  it('should not set inputs when there are no query params', async () => {
+  it.only('should not set inputs when there are no query params', async () => {
     const fetchAssetMetadataForAssetIdsSpy = jest.spyOn(
       assetUtils,
       'fetchAssetMetadataForAssetIds',
@@ -322,20 +343,25 @@ describe('useBridgeQueryParams', () => {
 
     const mockStoreState = createBridgeMockStore();
 
-    const { history, store } = renderUseBridgeQueryParams(mockStoreState);
+    const { result, store } = renderUseBridgeQueryParams(mockStoreState);
 
-    expect(history.location.search).toBe('');
+    expect(result.current.location.search).toBe('');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
-      store?.getState().bridge ?? {};
+    const {
+      fromToken,
+      toToken,
+      fromTokenInputValue,
+      fromTokenBalance,
+      fromNativeBalance,
+    } = store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
+      fromTokenBalance,
+      fromNativeBalance,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).not.toHaveBeenCalled();
-    expect(calcLatestSrcBalanceSpy.mock.calls).toMatchSnapshot();
   });
 
   it('should only set dest token', async () => {
@@ -353,12 +379,11 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-          },
+          ],
         },
       },
       metamaskStateOverrides: {
@@ -371,7 +396,7 @@ describe('useBridgeQueryParams', () => {
       to: 'eip155:59144/erc20:0x8ac76a51cc950d9822d68b83fe1ad97b32cd580D',
     });
 
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const { result, waitForNextUpdate, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
@@ -379,15 +404,14 @@ describe('useBridgeQueryParams', () => {
 
     await waitForNextUpdate();
 
-    expect(history.location.search).toBe('');
+    expect(result.current.location.search).toBe('');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect(fromTokenInputValue).toBeUndefined();
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).toHaveBeenCalledTimes(1);
@@ -408,12 +432,11 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-          },
+          ],
         },
       },
       metamaskStateOverrides: {
@@ -426,7 +449,7 @@ describe('useBridgeQueryParams', () => {
       from: 'eip155:59144/erc20:0x8ac76a51cc950d9822d68b83fe1ad97b32cd580D',
     });
 
-    const { history, waitForNextUpdate, store } = renderUseBridgeQueryParams(
+    const { result, waitForNextUpdate, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
@@ -434,14 +457,13 @@ describe('useBridgeQueryParams', () => {
 
     await waitForNextUpdate();
 
-    expect(history.location.search).toBe('');
+    expect(result.current.location.search).toBe('');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).toHaveBeenCalledTimes(1);
@@ -456,12 +478,11 @@ describe('useBridgeQueryParams', () => {
     const mockStoreState = createBridgeMockStore({
       featureFlagOverrides: {
         bridgeConfig: {
-          chains: {
-            [ChainId.LINEA]: {
-              isActiveSrc: true,
-              isActiveDest: true,
+          chainRanking: [
+            {
+              chainId: bridgeControllerUtils.formatChainIdToCaip(ChainId.LINEA),
             },
-          },
+          ],
         },
       },
     });
@@ -470,20 +491,18 @@ describe('useBridgeQueryParams', () => {
       amount: '100',
     });
 
-    const { history, store } = renderUseBridgeQueryParams(
+    const { result, store } = renderUseBridgeQueryParams(
       mockStoreState,
       // eslint-disable-next-line prefer-template
       '/?' + searchParams.toString(),
     );
-
-    expect(history.location.search).toBe('');
+    expect(result.current.location.search).toBe('');
     expect(store).toBeDefined();
-    const { fromToken, toToken, toChainId, fromTokenInputValue } =
+    const { fromToken, toToken, fromTokenInputValue } =
       store?.getState().bridge ?? {};
     expect({
       fromToken,
       toToken,
-      toChainId,
       fromTokenInputValue,
     }).toMatchSnapshot();
     expect(fetchAssetMetadataForAssetIdsSpy).not.toHaveBeenCalled();

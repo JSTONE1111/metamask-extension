@@ -26,6 +26,7 @@ const REMOVE_KEYS = [
   'phishingLists',
   'stalelistLastFetched',
   'whitelist',
+  'whitelistPaths',
 
   // SeedlessOnboardingController
   'accessToken',
@@ -36,6 +37,7 @@ const REMOVE_KEYS = [
   'revokeToken',
   'vaultEncryptionKey',
   'vaultEncryptionSalt',
+  'pendingToBeRevokedTokens',
 
   // SnapController
   'snapStates',

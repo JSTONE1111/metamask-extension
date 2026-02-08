@@ -29,10 +29,8 @@ type IFrameMessage<TAction extends LedgerAction> = {
  * that the keyring can call into for specific functions. The bridge then makes
  * whatever calls or requests it needs to in order to fulfill the request from
  * the keyring. In this case, the bridge is used to communicate with the
- * Offscreen Document. Inside the Offscreen document the ledger script is
- * loaded and registers a listener for these calls and communicate with the
- * ledger device via the ledger keyring iframe. The ledger keyring iframe is
- * added to the offscreen.html file directly.
+ * Offscreen Document. Inside the Offscreen document the ledger script
+ * communicates directly with the Ledger device via WebHID.
  */
 export class LedgerOffscreenBridge
   implements LedgerBridge<LedgerOffscreenBridgeOptions>
@@ -79,6 +77,15 @@ export class LedgerOffscreenBridge
       {
         action: LedgerAction.updateTransport,
         params: { transportType },
+      },
+      { timeout: MESSAGE_TIMEOUT },
+    );
+  }
+
+  getAppNameAndVersion(): Promise<{ appName: string; version: string }> {
+    return this.#sendMessage(
+      {
+        action: LedgerAction.getAppNameAndVersion,
       },
       { timeout: MESSAGE_TIMEOUT },
     );

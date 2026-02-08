@@ -1,5 +1,5 @@
 import { HttpError } from '@metamask/controller-utils';
-import * as networkUtilsModule from '../../../../shared/lib/network-utils';
+import * as utilModule from '../util';
 import {
   onRpcEndpointDegraded,
   onRpcEndpointUnavailable,
@@ -14,8 +14,8 @@ describe('onRpcEndpointUnavailable', () => {
     Parameters<typeof networkControllerUtilsModule.shouldCreateRpcServiceEvents>
   >;
   let isPublicEndpointUrlMock: jest.SpyInstance<
-    ReturnType<typeof networkUtilsModule.isPublicEndpointUrl>,
-    Parameters<typeof networkUtilsModule.isPublicEndpointUrl>
+    ReturnType<typeof utilModule.isPublicEndpointUrl>,
+    Parameters<typeof utilModule.isPublicEndpointUrl>
   >;
 
   beforeEach(() => {
@@ -24,10 +24,7 @@ describe('onRpcEndpointUnavailable', () => {
       'shouldCreateRpcServiceEvents',
     );
 
-    isPublicEndpointUrlMock = jest.spyOn(
-      networkUtilsModule,
-      'isPublicEndpointUrl',
-    );
+    isPublicEndpointUrlMock = jest.spyOn(utilModule, 'isPublicEndpointUrl');
   });
 
   it('calls shouldCreateRpcServiceEvents with the correct parameters', () => {
@@ -75,6 +72,7 @@ describe('onRpcEndpointUnavailable', () => {
         event: 'RPC Service Unavailable',
         properties: {
           chain_id_caip: 'eip155:11155111',
+          rpc_domain: 'example.com',
           rpc_endpoint_url: 'example.com',
         },
       });
@@ -104,6 +102,7 @@ describe('onRpcEndpointUnavailable', () => {
         properties: {
           chain_id_caip: 'eip155:11155111',
           http_status: 420,
+          rpc_domain: 'example.com',
           rpc_endpoint_url: 'example.com',
         },
       });
@@ -132,6 +131,7 @@ describe('onRpcEndpointUnavailable', () => {
         event: 'RPC Service Unavailable',
         properties: {
           chain_id_caip: 'eip155:11155111',
+          rpc_domain: 'custom',
           rpc_endpoint_url: 'custom',
         },
       });
@@ -167,8 +167,8 @@ describe('onRpcEndpointDegraded', () => {
     Parameters<typeof networkControllerUtilsModule.shouldCreateRpcServiceEvents>
   >;
   let isPublicEndpointUrlMock: jest.SpyInstance<
-    ReturnType<typeof networkUtilsModule.isPublicEndpointUrl>,
-    Parameters<typeof networkUtilsModule.isPublicEndpointUrl>
+    ReturnType<typeof utilModule.isPublicEndpointUrl>,
+    Parameters<typeof utilModule.isPublicEndpointUrl>
   >;
 
   beforeEach(() => {
@@ -177,10 +177,7 @@ describe('onRpcEndpointDegraded', () => {
       'shouldCreateRpcServiceEvents',
     );
 
-    isPublicEndpointUrlMock = jest.spyOn(
-      networkUtilsModule,
-      'isPublicEndpointUrl',
-    );
+    isPublicEndpointUrlMock = jest.spyOn(utilModule, 'isPublicEndpointUrl');
   });
 
   it('calls shouldCreateRpcServiceEvents with the correct parameters', () => {
@@ -228,6 +225,7 @@ describe('onRpcEndpointDegraded', () => {
         event: 'RPC Service Degraded',
         properties: {
           chain_id_caip: 'eip155:11155111',
+          rpc_domain: 'example.com',
           rpc_endpoint_url: 'example.com',
         },
       });
@@ -257,6 +255,7 @@ describe('onRpcEndpointDegraded', () => {
         properties: {
           chain_id_caip: 'eip155:11155111',
           http_status: 420,
+          rpc_domain: 'example.com',
           rpc_endpoint_url: 'example.com',
         },
       });
@@ -285,6 +284,7 @@ describe('onRpcEndpointDegraded', () => {
         event: 'RPC Service Degraded',
         properties: {
           chain_id_caip: 'eip155:11155111',
+          rpc_domain: 'custom',
           rpc_endpoint_url: 'custom',
         },
       });

@@ -51,7 +51,7 @@ const NativeAsset = ({ token, chainId }: { token: Token; chainId: Hex }) => {
   const accountLink = isEvm
     ? getAccountLink(address, chainId, rpcPrefs)
     : addressLink;
-  const trackEvent = useContext(MetaMetricsContext);
+  const { trackEvent } = useContext(MetaMetricsContext);
   const isOriginalNativeSymbol = useIsOriginalNativeTokenSymbol(
     chainId,
     symbol,
@@ -71,7 +71,6 @@ const NativeAsset = ({ token, chainId }: { token: Token; chainId: Hex }) => {
       optionsButton={
         <AssetOptions
           isNativeAsset={true}
-          isEvm={isEvm}
           onClickBlockExplorer={() => {
             trackEvent({
               event: 'Clicked Block Explorer Link',

@@ -3,7 +3,7 @@ import { fireEvent } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import configureStore from '../../../../../store/store';
 import mockState from '../../../../../../test/data/mock-state.json';
-import { renderWithProvider } from '../../../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../../../test/lib/render-helpers-navigate';
 import { useI18nContext } from '../../../../../hooks/useI18nContext';
 import { useRecipientSelectionMetrics } from '../../../hooks/send/metrics/useRecipientSelectionMetrics';
 import { useSendContext } from '../../../context/send';
@@ -15,6 +15,11 @@ jest.mock('../../../../../hooks/useI18nContext');
 jest.mock('../../../hooks/send/metrics/useRecipientSelectionMetrics');
 jest.mock('../../../context/send');
 jest.mock('../../../hooks/send/useRecipients');
+jest.mock('../../../hooks/send/useAccountAddressSeedIconMap', () => ({
+  useAccountAddressSeedIconMap: jest.fn().mockReturnValue({
+    accountAddressSeedIconMap: new Map(),
+  }),
+}));
 
 describe('RecipientInput', () => {
   const mockUseI18nContext = jest.mocked(useI18nContext);

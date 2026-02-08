@@ -2,7 +2,11 @@ import { CHAIN_IDS } from '@metamask/transaction-controller';
 import { SolMethod } from '@metamask/keyring-api';
 import { base58 } from 'ethers/lib/utils';
 import { assert } from '@metamask/superstruct';
-import { AllowedBridgeChainIds } from '../../constants/bridge';
+import {
+  KnownCaipNamespace,
+  parseCaipChainId,
+  type CaipChainId,
+} from '@metamask/utils';
 import {
   ScanTokenRequest,
   TokenFeature,
@@ -12,6 +16,7 @@ import {
   MessageScanResponse,
 } from '../../types/security-alerts-api';
 import { MultichainNetworks } from '../../constants/multichain/networks';
+import { decimalToPrefixedHex } from '../conversion.utils';
 
 const DOMAIN = 'https://metamask.io';
 
@@ -135,10 +140,7 @@ export function getTokenFeatureTitleDescriptionIds(
   return { ...tokenFeature, titleId, descriptionId };
 }
 
-export const CHAIN_ID_TO_SECURITY_API_NAME: Record<
-  AllowedBridgeChainIds,
-  string | null
-> = {
+const CHAIN_ID_TO_SECURITY_API_NAME: Record<string, string | null> = {
   [CHAIN_IDS.MAINNET]: 'ethereum',
   [CHAIN_IDS.LINEA_MAINNET]: 'linea',
   [CHAIN_IDS.POLYGON]: 'polygon',
@@ -149,6 +151,7 @@ export const CHAIN_ID_TO_SECURITY_API_NAME: Record<
   [CHAIN_IDS.ZKSYNC_ERA]: 'zksync',
   [CHAIN_IDS.BASE]: 'base',
   [CHAIN_IDS.SEI]: 'sei',
+  [CHAIN_IDS.MONAD]: 'monad',
   [MultichainNetworks.SOLANA]: 'solana',
   [MultichainNetworks.BITCOIN]: 'bitcoin',
   [MultichainNetworks.BITCOIN_TESTNET]: null, // not supported
@@ -158,14 +161,26 @@ export const CHAIN_ID_TO_SECURITY_API_NAME: Record<
 };
 
 export function convertChainIdToBlockAidChainName(
-  chainId: AllowedBridgeChainIds,
+  chainId: CaipChainId,
 ): string | null {
-  return CHAIN_ID_TO_SECURITY_API_NAME[chainId] ?? null;
+  try {
+    const { namespace, reference } = parseCaipChainId(chainId);
+    const name =
+      CHAIN_ID_TO_SECURITY_API_NAME[
+        namespace === KnownCaipNamespace.Eip155
+          ? decimalToPrefixedHex(reference)
+          : chainId
+      ];
+    return name ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchTxAlerts(
   params: {
-    chainId: AllowedBridgeChainIds;
+    signal: AbortSignal;
+    chainId: CaipChainId;
     trade: string;
     accountAddress: string;
   } | null,
@@ -174,7 +189,7 @@ export async function fetchTxAlerts(
     return null;
   }
 
-  const { chainId, trade, accountAddress } = params;
+  const { chainId, trade, accountAddress, signal } = params;
 
   const chain = convertChainIdToBlockAidChainName(chainId);
 
@@ -205,6 +220,7 @@ export async function fetchTxAlerts(
     headers: {
       'Content-Type': 'application/json',
     },
+    signal,
   });
 
   if (!response.ok) {

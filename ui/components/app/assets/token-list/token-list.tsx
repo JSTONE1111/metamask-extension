@@ -3,18 +3,17 @@ import { useSelector } from 'react-redux';
 import { type CaipChainId, type Hex } from '@metamask/utils';
 import { NON_EVM_TESTNET_IDS } from '@metamask/multichain-network-controller';
 import TokenCell from '../token-cell';
+import { ASSET_CELL_HEIGHT } from '../constants';
 import {
-  getChainIdsToPoll,
   getEnabledNetworksByNamespace,
   getIsMultichainAccountsState2Enabled,
-  getNewTokensImported,
   getPreferences,
   getSelectedAccount,
+  getShouldHideZeroBalanceTokens,
   getTokenSortConfig,
+  getUseExternalServices,
 } from '../../../../selectors';
 import { endTrace, TraceName } from '../../../../../shared/lib/trace';
-import { useTokenBalances as pollAndUpdateEvmBalances } from '../../../../hooks/useTokenBalances';
-import { useNetworkFilter } from '../hooks';
 import { type TokenWithFiatAmount } from '../types';
 import { filterAssets } from '../util/filter';
 import { sortAssets } from '../util/sort';
@@ -27,6 +26,7 @@ import {
 import {
   getAssetsBySelectedAccountGroup,
   getTokenBalancesEvm,
+  selectAccountGroupBalanceForEmptyState,
 } from '../../../../selectors/assets';
 import {
   MetaMetricsEventCategory,
@@ -34,8 +34,12 @@ import {
 } from '../../../../../shared/constants/metametrics';
 import { MetaMetricsContext } from '../../../../contexts/metametrics';
 import { SafeChain } from '../../../../pages/settings/networks-tab/networks-form/use-safe-chains';
-import { isGlobalNetworkSelectorRemoved } from '../../../../selectors/selectors';
-import { isEvmChainId } from '../../../../../shared/lib/asset-utils';
+import {
+  isEvmChainId,
+  isTronResource,
+} from '../../../../../shared/lib/asset-utils';
+import { sortAssetsWithPriority } from '../util/sortAssetsWithPriority';
+import { VirtualizedList } from '../../../ui/virtualized-list/virtualized-list';
 
 type TokenListProps = {
   onTokenClick: (chainId: string, address: string) => void;
@@ -46,8 +50,6 @@ type TokenListProps = {
 // eslint-disable-next-line @typescript-eslint/naming-convention
 function TokenList({ onTokenClick, safeChains }: TokenListProps) {
   const isEvm = useSelector(getIsEvmMultichainNetworkSelected);
-  const chainIdsToPoll = useSelector(getChainIdsToPoll);
-  const newTokensImported = useSelector(getNewTokensImported);
   const currentNetwork = useSelector(getSelectedMultichainNetworkConfiguration);
   const { privacyMode } = useSelector(getPreferences);
   const tokenSortConfig = useSelector(getTokenSortConfig);
@@ -55,30 +57,24 @@ function TokenList({ onTokenClick, safeChains }: TokenListProps) {
   const evmBalances = useSelector((state) =>
     getTokenBalancesEvm(state, selectedAccount.address),
   );
-  const trackEvent = useContext(MetaMetricsContext);
-  // EVM specific tokenBalance polling, updates state via polling loop per chainId
-  pollAndUpdateEvmBalances({
-    chainIds: chainIdsToPoll as Hex[],
-  });
+  const shouldHideZeroBalanceTokens = useSelector(
+    getShouldHideZeroBalanceTokens,
+  );
+  const hasBalance = useSelector(selectAccountGroupBalanceForEmptyState);
+  const { trackEvent } = useContext(MetaMetricsContext);
 
   const accountGroupIdAssets = useSelector(getAssetsBySelectedAccountGroup);
 
   const multichainAssets = useMultiChainAssets();
 
   // network filter to determine which tokens to show in list
-  // on EVM we want to filter based on network filter controls, on non-evm we only want tokens from that chain identifier
-  const { networkFilter } = useNetworkFilter();
-  const enabledNetworksByNamespace = useSelector(getEnabledNetworksByNamespace);
+  const networksToShow = useSelector(getEnabledNetworksByNamespace);
 
   const isMultichainAccountsState2Enabled = useSelector(
     getIsMultichainAccountsState2Enabled,
   );
 
-  const networksToShow = useMemo(() => {
-    return isGlobalNetworkSelectorRemoved
-      ? enabledNetworksByNamespace
-      : networkFilter;
-  }, [enabledNetworksByNamespace, networkFilter]);
+  const useExternalServices = useSelector(getUseExternalServices);
 
   const allEnabledNetworksForAllNamespaces = useSelector(
     getAllEnabledNetworksForAllNamespaces,
@@ -95,9 +91,18 @@ function TokenList({ onTokenClick, safeChains }: TokenListProps) {
         },
       ]);
 
-      return sortAssets([...filteredAssets], tokenSortConfig);
-    }
+      // Filter out non-EVM assets when basic functionality toggle is OFF
+      // Exception: Keep assets for the currently selected non-EVM chain
+      const finalAssets = useExternalServices
+        ? filteredAssets
+        : filteredAssets.filter(
+            (asset) =>
+              isEvmChainId(asset.chainId) ||
+              (!isEvm && asset.chainId === currentNetwork.chainId),
+          );
 
+      return sortAssets([...finalAssets], tokenSortConfig);
+    }
     const accountAssetsPreSort = Object.entries(accountGroupIdAssets).flatMap(
       ([chainId, assets]) => {
         if (!allEnabledNetworksForAllNamespaces.includes(chainId)) {
@@ -105,30 +110,45 @@ function TokenList({ onTokenClick, safeChains }: TokenListProps) {
         }
 
         // Mapping necessary to comply with the type. Fields will be overriden with useTokenDisplayInfo
-        return assets.map((asset) => {
-          const token: TokenWithFiatAmount = {
-            ...asset,
-            tokenFiatAmount: asset.fiat?.balance,
-            secondary: null,
-            title: asset.name,
-            address:
-              'address' in asset ? asset.address : (asset.assetId as Hex),
-            chainId: asset.chainId as Hex,
-          };
-
-          return token;
+        return assets.filter((asset) => {
+          if (isTronResource(asset)) {
+            return false;
+          }
+          if (shouldHideZeroBalanceTokens && asset.balance === '0') {
+            return false;
+          }
+          return true;
         });
       },
     );
 
-    const accountAssets = sortAssets(
-      [...accountAssetsPreSort],
+    const accountAssets = sortAssetsWithPriority(
+      accountAssetsPreSort,
       tokenSortConfig,
     );
 
-    return accountAssets;
+    // Filter out non-EVM assets when basic functionality toggle is OFF
+    // Exception: Keep assets for the currently selected non-EVM chain
+    const finalAccountAssets = useExternalServices
+      ? accountAssets
+      : accountAssets.filter(
+          (asset) =>
+            isEvmChainId(asset.chainId) ||
+            (!isEvm && asset.chainId === currentNetwork.chainId),
+        );
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return finalAccountAssets.map((asset) => {
+      const token: TokenWithFiatAmount = {
+        ...asset,
+        tokenFiatAmount: asset.fiat?.balance,
+        secondary: null,
+        title: asset.name,
+        address: 'address' in asset ? asset.address : (asset.assetId as Hex),
+        chainId: asset.chainId as Hex,
+      };
+
+      return token;
+    });
   }, [
     isEvm,
     evmBalances,
@@ -138,9 +158,9 @@ function TokenList({ onTokenClick, safeChains }: TokenListProps) {
     tokenSortConfig,
     isMultichainAccountsState2Enabled,
     accountGroupIdAssets,
-    // newTokensImported included in deps, but not in hook's logic
-    newTokensImported,
     allEnabledNetworksForAllNamespaces,
+    shouldHideZeroBalanceTokens,
+    useExternalServices,
   ]);
 
   useEffect(() => {
@@ -177,24 +197,52 @@ function TokenList({ onTokenClick, safeChains }: TokenListProps) {
     });
   };
 
+  // Disable virtualization when empty balance state is shown
+  if (!hasBalance) {
+    return (
+      <div className="token-list-non-virtualized">
+        {sortedFilteredTokens.map((token) => {
+          const isNonEvmTestnet = NON_EVM_TESTNET_IDS.includes(
+            token.chainId as CaipChainId,
+          );
+
+          return (
+            <TokenCell
+              key={`${token.chainId}-${token.symbol}-${token.address}`}
+              token={token}
+              privacyMode={privacyMode}
+              onClick={isNonEvmTestnet ? undefined : handleTokenClick(token)}
+              safeChains={safeChains}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <>
-      {sortedFilteredTokens.map((token: TokenWithFiatAmount) => {
+    <VirtualizedList
+      data={sortedFilteredTokens}
+      estimatedItemSize={ASSET_CELL_HEIGHT}
+      overscan={10}
+      keyExtractor={(token) =>
+        `${token.chainId}-${token.symbol}-${token.address}`
+      }
+      renderItem={({ item: token }) => {
         const isNonEvmTestnet = NON_EVM_TESTNET_IDS.includes(
           token.chainId as CaipChainId,
         );
 
         return (
           <TokenCell
-            key={`${token.chainId}-${token.symbol}-${token.address}`}
             token={token}
             privacyMode={privacyMode}
             onClick={isNonEvmTestnet ? undefined : handleTokenClick(token)}
             safeChains={safeChains}
           />
         );
-      })}
-    </>
+      }}
+    />
   );
 }
 

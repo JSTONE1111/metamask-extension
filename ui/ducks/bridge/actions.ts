@@ -2,40 +2,39 @@ import {
   BridgeBackgroundAction,
   type BridgeController,
   BridgeUserAction,
-  formatChainIdToCaip,
-  isNativeAddress,
-  isSolanaChainId,
   type RequiredEventContextFromClient,
   UnifiedSwapBridgeEventName,
+  isCrossChain,
+  isNonEvmChainId,
 } from '@metamask/bridge-controller';
-import { type InternalAccount } from '@metamask/keyring-internal-api';
-import { type CaipChainId } from '@metamask/utils';
-import type {
-  AddNetworkFields,
-  NetworkConfiguration,
-} from '@metamask/network-controller';
-import { trace, TraceName } from '../../../shared/lib/trace';
+import { CaipAssetType, parseCaipAssetType } from '@metamask/utils';
+import { selectDefaultNetworkClientIdsByChainId } from '../../../shared/modules/selectors/networks';
 import {
   forceUpdateMetamaskState,
   setActiveNetworkWithError,
+  setEnabledAllPopularNetworks,
 } from '../../store/actions';
 import { submitRequestToBackground } from '../../store/background-connection';
 import type { MetaMaskReduxDispatch } from '../../store/store';
+import { getMultichainProviderConfig } from '../../selectors/multichain';
+import { clearAllBridgeCacheItems } from '../../pages/bridge/utils/cache';
 import {
   bridgeSlice,
-  setDestTokenExchangeRates,
-  setDestTokenUsdExchangeRates,
   setSrcTokenExchangeRates,
   setTxAlerts,
-  setEVMSrcTokenBalance as setEVMSrcTokenBalance_,
+  setEVMSrcTokenBalance,
   setEVMSrcNativeBalance,
 } from './bridge';
 import type { TokenPayload } from './types';
-import { isNetworkAdded } from './utils';
+import {
+  type BridgeAppState,
+  getFromAccount,
+  getLastSelectedChainId,
+} from './selectors';
+import { getMaybeHexChainId } from './utils';
 
 const {
-  setToChainId,
-  setFromToken,
+  setFromToken: setFromTokenAction,
   setToToken,
   setFromTokenInputValue,
   resetInputFields,
@@ -47,20 +46,15 @@ const {
 } = bridgeSlice.actions;
 
 export {
-  setToChainId,
   resetInputFields,
   setToToken,
-  setFromToken,
   setFromTokenInputValue,
-  setDestTokenExchangeRates,
-  setDestTokenUsdExchangeRates,
   setSrcTokenExchangeRates,
   setSortOrder,
   setSelectedQuote,
   setWasTxDeclined,
   setSlippage,
   setTxAlerts,
-  setEVMSrcNativeBalance,
   restoreQuoteRequestFromState,
 };
 
@@ -79,6 +73,7 @@ export const resetBridgeState = () => {
   return async (dispatch: MetaMaskReduxDispatch) => {
     dispatch(resetInputFields());
     dispatch(callBridgeControllerMethod(BridgeBackgroundAction.RESET_STATE));
+    await clearAllBridgeCacheItems();
   };
 };
 
@@ -119,80 +114,67 @@ export const updateQuoteRequestParams = (
   };
 };
 
-export const setEVMSrcTokenBalance = (
-  token: TokenPayload['payload'],
-  selectedAddress?: string,
-) => {
-  return async (dispatch: MetaMaskReduxDispatch) => {
-    if (token) {
-      trace({
-        name: TraceName.BridgeBalancesUpdated,
-        data: {
-          srcChainId: formatChainIdToCaip(token.chainId),
-          isNative: isNativeAddress(token.address),
-        },
-        startTime: Date.now(),
-      });
-      await dispatch(
-        setEVMSrcTokenBalance_({
-          selectedAddress,
-          tokenAddress: token.address,
-          chainId: token.chainId,
-        }),
-      );
+export const setEvmBalances = (assetId: CaipAssetType) => {
+  return async (
+    dispatch: MetaMaskReduxDispatch,
+    getState: () => BridgeAppState,
+  ) => {
+    const selectedAddress = getFromAccount(getState())?.address;
+    if (!selectedAddress) {
+      return;
     }
+    const { chainId, assetReference } = parseCaipAssetType(assetId);
+    await dispatch(
+      setEVMSrcTokenBalance({
+        selectedAddress,
+        tokenAddress: assetReference,
+        chainId,
+        assetId,
+      }),
+    );
+    await dispatch(
+      setEVMSrcNativeBalance({
+        selectedAddress,
+        chainId,
+      }),
+    );
   };
 };
 
-export const setFromChain = ({
-  networkConfig,
-  selectedAccount,
-  token = null,
-}: {
-  networkConfig?:
-    | NetworkConfiguration
-    | AddNetworkFields
-    | (Omit<NetworkConfiguration, 'chainId'> & { chainId: CaipChainId });
-  selectedAccount: InternalAccount | null;
-  token?: TokenPayload['payload'];
-}) => {
-  return async (dispatch: MetaMaskReduxDispatch) => {
-    if (!networkConfig) {
-      return;
-    }
-    const isSolana = isSolanaChainId(networkConfig.chainId);
+export const setFromToken = (token: TokenPayload) => {
+  return async (
+    dispatch: MetaMaskReduxDispatch,
+    getState: () => BridgeAppState,
+  ) => {
+    const { assetId } = token;
+    const { chainId } = parseCaipAssetType(assetId);
+    const isNonEvm = isNonEvmChainId(chainId);
+
+    const currentChainId = getMultichainProviderConfig(getState()).chainId;
+    const maybeHexChainId = getMaybeHexChainId(chainId);
+    const currentNetworkMatchesToken = [chainId, maybeHexChainId].some(
+      (c) => c && c === currentChainId,
+    );
+
     // Set the src network
-    if (isSolana) {
-      dispatch(setActiveNetworkWithError(networkConfig.chainId));
-    } else {
-      const networkId = isNetworkAdded(networkConfig)
-        ? networkConfig.rpcEndpoints?.[networkConfig.defaultRpcEndpointIndex]
-            ?.networkClientId
-        : null;
-      if (networkId) {
-        dispatch(setActiveNetworkWithError(networkId));
+    if (!currentNetworkMatchesToken) {
+      // If the source chain changes, enable All Networks view so the user
+      // can see their bridging activity on the new chain
+      const lastSelectedChainId = getLastSelectedChainId(getState());
+      if (isCrossChain(chainId, lastSelectedChainId)) {
+        dispatch(setEnabledAllPopularNetworks());
+      }
+      if (isNonEvm) {
+        dispatch(setActiveNetworkWithError(chainId));
+      } else if (maybeHexChainId) {
+        const networkId =
+          selectDefaultNetworkClientIdsByChainId(getState())[maybeHexChainId];
+        if (networkId) {
+          dispatch(setActiveNetworkWithError(networkId));
+        }
       }
     }
-    // Set the src token
-    if (token) {
-      dispatch(setFromToken(token));
-    }
-    // Fetch the native EVM balance
-    if (selectedAccount && !isSolana) {
-      trace({
-        name: TraceName.BridgeBalancesUpdated,
-        data: {
-          srcChainId: formatChainIdToCaip(networkConfig.chainId),
-          isNative: true,
-        },
-        startTime: Date.now(),
-      });
-      await dispatch(
-        setEVMSrcNativeBalance({
-          selectedAddress: selectedAccount.address,
-          chainId: networkConfig.chainId,
-        }),
-      );
-    }
+    // Set the fromToken
+    dispatch(setFromTokenAction(token));
   };
 };

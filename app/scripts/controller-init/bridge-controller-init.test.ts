@@ -1,6 +1,6 @@
-import { Messenger } from '@metamask/base-controller';
 import { BridgeController } from '@metamask/bridge-controller';
 import { BRIDGE_API_BASE_URL } from '../../../shared/constants/bridge';
+import { getRootMessenger } from '../lib/messenger';
 import { ControllerInitRequest } from './types';
 import { buildControllerInitRequestMock } from './test/utils';
 import {
@@ -11,7 +11,12 @@ import {
 } from './messengers';
 import { BridgeControllerInit } from './bridge-controller-init';
 
-jest.mock('@metamask/bridge-controller');
+jest.mock('@metamask/bridge-controller', () => {
+  return {
+    ...jest.requireActual('@metamask/bridge-controller'),
+    BridgeController: jest.fn(),
+  };
+});
 
 function getInitRequestMock(): jest.Mocked<
   ControllerInitRequest<
@@ -19,7 +24,7 @@ function getInitRequestMock(): jest.Mocked<
     BridgeControllerInitMessenger
   >
 > {
-  const baseMessenger = new Messenger<never, never>();
+  const baseMessenger = getRootMessenger<never, never>();
 
   const requestMock = {
     ...buildControllerInitRequestMock(),
@@ -31,6 +36,10 @@ function getInitRequestMock(): jest.Mocked<
 }
 
 describe('BridgeControllerInit', () => {
+  beforeEach(() => {
+    process.env.METAMASK_VERSION = 'MOCK_VERSION';
+  });
+
   it('initializes the controller', () => {
     const { controller } = BridgeControllerInit(getInitRequestMock());
     expect(controller).toBeInstanceOf(BridgeController);
@@ -44,6 +53,7 @@ describe('BridgeControllerInit', () => {
       messenger: expect.any(Object),
       state: undefined,
       clientId: 'extension',
+      clientVersion: 'MOCK_VERSION',
       config: {
         customBridgeApiBaseUrl: BRIDGE_API_BASE_URL,
       },

@@ -7,7 +7,7 @@ import {
   SOLANA_ASSET,
 } from '../../../../../test/data/send/assets';
 import mockState from '../../../../../test/data/mock-state.json';
-import { renderHookWithProvider } from '../../../../../test/lib/render-helpers';
+import { renderHookWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import * as SendContext from '../../context/send';
 import { useMaxAmount } from './useMaxAmount';
 import { useBalance } from './useBalance';
@@ -56,6 +56,32 @@ describe('useMaxAmount', () => {
     });
 
     expect(result.getMaxAmount()).toEqual('999.999570668411440000');
+  });
+
+  it('not throw error if gas fee estimates is not available', () => {
+    jest.spyOn(SendContext, 'useSendContext').mockReturnValue({
+      asset: EVM_NATIVE_ASSET,
+      chainId: '0x5',
+      from: MOCK_ADDRESS_1,
+    } as unknown as SendContext.SendContextType);
+    useBalanceMock.mockReturnValue({
+      balance: '10.00',
+      decimals: 18,
+      rawBalanceNumeric: new Numeric('1000000000000000000000', 10),
+    });
+    const result = renderHook({
+      ...mockState,
+      metamask: {
+        ...mockState.metamask,
+        gasFeeEstimatesByChainId: {
+          '0x5': {
+            gasFeeEstimates: {},
+          },
+        },
+      },
+    });
+
+    expect(result.getMaxAmount()).toEqual('1000');
   });
 
   it('return 0 if balance of native asset is less than gas needed', () => {

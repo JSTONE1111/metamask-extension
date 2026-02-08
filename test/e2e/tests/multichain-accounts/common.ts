@@ -1,6 +1,6 @@
 import { Mockttp } from 'mockttp';
 import { Driver } from '../../webdriver/driver';
-import FixtureBuilder from '../../fixture-builder';
+import FixtureBuilder from '../../fixtures/fixture-builder';
 import { withFixtures } from '../../helpers';
 import AccountListPage from '../../page-objects/pages/account-list-page';
 import HeaderNavbar from '../../page-objects/pages/header-navbar';
@@ -10,9 +10,7 @@ import {
   loginWithoutBalanceValidation,
 } from '../../page-objects/flows/login.flow';
 import { MockedEndpoint } from '../../mock-e2e';
-
-export const FEATURE_FLAGS_URL =
-  'https://client-config.api.cx.metamask.io/v1/flags';
+import { mockPriceApi } from '../tokens/utils/mocks';
 
 export enum AccountType {
   MultiSRP = 'multi-srp',
@@ -20,116 +18,70 @@ export enum AccountType {
   HardwareWallet = 'hardware-wallet',
 }
 
-export const mockMultichainAccountsFeatureFlag = (mockServer: Mockttp) =>
-  mockServer
-    .forGet(FEATURE_FLAGS_URL)
-    .withQuery({
-      client: 'extension',
-      distribution: 'main',
-      environment: 'dev',
-    })
-    .thenCallback(() => {
-      return {
-        ok: true,
-        statusCode: 200,
-        json: [
-          {
-            enableMultichainAccounts: {
-              enabled: true,
-              featureVersion: '1',
-              minimumVersion: '12.19.0',
-            },
-          },
-        ],
-      };
-    });
-
-export const mockMultichainAccountsFeatureFlagStateTwo = (
-  mockServer: Mockttp,
-) =>
-  mockServer
-    .forGet(FEATURE_FLAGS_URL)
-    .withQuery({
-      client: 'extension',
-      distribution: 'main',
-      environment: 'dev',
-    })
-    .thenCallback(() => {
-      return {
-        ok: true,
-        statusCode: 200,
-        json: [
-          {
-            enableMultichainAccountsState2: {
-              enabled: true,
-              featureVersion: '2',
-              minimumVersion: '12.19.0',
-            },
-          },
-        ],
-      };
-    });
-
 export async function withMultichainAccountsDesignEnabled(
   {
     title,
-    testSpecificMock = mockMultichainAccountsFeatureFlag,
+    testSpecificMock,
     accountType = AccountType.MultiSRP,
-    state = 1,
+    dappOptions,
   }: {
     title?: string;
-    testSpecificMock?: (mockServer: Mockttp) => Promise<MockedEndpoint>;
+    testSpecificMock?: (
+      mockServer: Mockttp,
+    ) => Promise<MockedEndpoint | MockedEndpoint[]>;
     accountType?: AccountType;
-    state?: number;
+    dappOptions?: { numberOfTestDapps?: number; customDappPaths?: string[] };
   },
   test: (driver: Driver) => Promise<void>,
 ) {
   let fixture;
 
   switch (accountType) {
-    case AccountType.MultiSRP:
-      fixture = new FixtureBuilder().withKeyringControllerMultiSRP().build();
-      break;
-    case AccountType.SSK:
-      fixture = new FixtureBuilder().withKeyringControllerMultiSRP().build();
-      break;
     case AccountType.HardwareWallet:
-      fixture = new FixtureBuilder().withLedgerAccount().build();
+      fixture = new FixtureBuilder()
+        .withLedgerAccount()
+        .withPreferencesControllerShowNativeTokenAsMainBalanceDisabled()
+        .withEnabledNetworks({ eip155: { '0x1': true } })
+        .build();
       break;
     default:
-      fixture = new FixtureBuilder().withKeyringControllerMultiSRP().build();
+      fixture = new FixtureBuilder()
+        .withKeyringControllerMultiSRP()
+        .withPreferencesControllerShowNativeTokenAsMainBalanceDisabled()
+        .withEnabledNetworks({ eip155: { '0x1': true } })
+        .build();
+      break;
   }
 
   await withFixtures(
     {
       fixtures: fixture,
-      testSpecificMock,
+      testSpecificMock: async (mockServer: Mockttp) => {
+        const additionalMocks = testSpecificMock
+          ? await testSpecificMock(mockServer)
+          : [];
+        return [await mockPriceApi(mockServer), [additionalMocks]];
+      },
       title,
-      dapp: true,
+      dappOptions,
     },
     async ({ driver }: { driver: Driver; mockServer: Mockttp }) => {
-      // State 2 uses unified account group balance (fiat) and may not equal '25 ETH'.
-      // Skip strict balance validation for hardware wallets and state 2 flows.
-      if (accountType === AccountType.HardwareWallet || state === 2) {
+      // Skip strict balance validation for hardware wallets
+      if (accountType === AccountType.HardwareWallet) {
         await loginWithoutBalanceValidation(driver);
       } else {
-        await loginWithBalanceValidation(driver);
+        await loginWithBalanceValidation(
+          driver,
+          undefined,
+          undefined,
+          '$85,025.00',
+        );
       }
       const homePage = new HomePage(driver);
       await homePage.checkPageIsLoaded();
       const headerNavbar = new HeaderNavbar(driver);
+      await headerNavbar.openAccountMenu();
 
-      if (state === 1) {
-        await headerNavbar.openAccountMenu();
-      } else {
-        await headerNavbar.openAccountsPage();
-      }
-
-      const accountListPage = new AccountListPage(driver);
-
-      if (state === 1) {
-        await accountListPage.checkPageIsLoaded();
-      }
       await test(driver);
     },
   );
@@ -141,7 +93,9 @@ const DUMMY_PRIVATE_KEY =
 export async function withImportedAccount(
   options: {
     title?: string;
-    testSpecificMock?: (mockServer: Mockttp) => Promise<MockedEndpoint>;
+    testSpecificMock?: (
+      mockServer: Mockttp,
+    ) => Promise<MockedEndpoint | MockedEndpoint[]>;
     privateKey?: string;
   },
   test: (driver: Driver) => Promise<void>,
@@ -150,6 +104,10 @@ export async function withImportedAccount(
     const accountListPage = new AccountListPage(driver);
     await accountListPage.addNewImportedAccount(
       options.privateKey ?? DUMMY_PRIVATE_KEY,
+      undefined,
+      {
+        isMultichainAccountsState2Enabled: true,
+      },
     );
     await test(driver);
   });

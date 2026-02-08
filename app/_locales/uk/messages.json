@@ -229,14 +229,8 @@
   "enterPasswordContinue": {
     "message": "Введіть пароль, щоб продовжити"
   },
-  "ethereumPublicAddress": {
-    "message": "Публічна адреса Ethereum"
-  },
   "etherscanView": {
     "message": "Переглянути обліковий запис на Etherscan"
-  },
-  "expandView": {
-    "message": "Розгорнути подання"
   },
   "failed": {
     "message": "Помилка"
@@ -390,9 +384,6 @@
   "needImportFile": {
     "message": "Потрібно вибрати файл для імпорту.",
     "description": "User is important an account and needs to add a file to continue"
-  },
-  "negativeETH": {
-    "message": "Не можливо наділсати від'ємну кількість ETH."
   },
   "networkName": {
     "message": "Ім’я мережі"

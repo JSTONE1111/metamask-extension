@@ -15,8 +15,13 @@ import { maskObject } from '../shared/modules/object.utils';
 // TODO: Remove restricted import
 // eslint-disable-next-line import/no-restricted-paths
 import { SENTRY_UI_STATE } from '../app/scripts/constants/sentry-state';
-import { ENVIRONMENT_TYPE_POPUP } from '../shared/constants/app';
+import {
+  ENVIRONMENT_TYPE_POPUP,
+  ENVIRONMENT_TYPE_SIDEPANEL,
+} from '../shared/constants/app';
+import { getBrowserName } from '../shared/modules/browser-runtime.utils';
 import { COPY_OPTIONS } from '../shared/constants/copy';
+import { START_UI_SYNC } from '../shared/constants/ui-initialization';
 import { switchDirection } from '../shared/lib/switch-direction';
 import { setupLocale } from '../shared/lib/error-utils';
 import { trace, TraceName } from '../shared/lib/trace';
@@ -28,6 +33,8 @@ import {
   getUnapprovedTransactions,
   getNetworkToAutomaticallySwitchTo,
   getAllPermittedAccountsForCurrentTab,
+  getIsSocialLoginFlow,
+  getFirstTimeFlowType,
 } from './selectors';
 import { ALERT_STATE } from './ducks/alerts';
 import {
@@ -43,11 +50,9 @@ import { SEEDLESS_PASSWORD_OUTDATED_CHECK_INTERVAL_MS } from './constants';
 
 export { CriticalStartupErrorHandler } from './helpers/utils/critical-startup-error-handler';
 export {
-  displayCriticalError,
+  displayCriticalErrorMessage,
   CriticalErrorTranslationKey,
 } from './helpers/utils/display-critical-error';
-
-const METHOD_START_UI_SYNC = 'startUISync';
 
 log.setLevel(global.METAMASK_DEBUG ? 'debug' : 'warn', false);
 
@@ -72,8 +77,8 @@ export const connectToBackground = (
     if (method === 'sendUpdate') {
       const store = await reduxStore.promise;
       store.dispatch(actions.updateMetamaskState(data.params[0]));
-    } else if (method === METHOD_START_UI_SYNC) {
-      await handleStartUISync();
+    } else if (method === START_UI_SYNC) {
+      await handleStartUISync(data.params[0]);
     } else {
       throw new Error(
         `Internal JSON-RPC Notification Not Handled:\n\n ${JSON.stringify(
@@ -84,17 +89,12 @@ export const connectToBackground = (
   });
 };
 
-export default async function launchMetamaskUi(opts) {
-  const { backgroundConnection, traceContext } = opts;
+export async function launchMetamaskUi(opts) {
+  const { backgroundConnection, initialState } = opts;
 
-  const metamaskState = await trace(
-    { name: TraceName.GetState, parentContext: traceContext },
-    backgroundConnection.getState.bind(backgroundConnection),
-  );
+  const store = await startApp(initialState, opts);
 
-  const store = await startApp(metamaskState, opts);
-
-  await backgroundConnection.startPatches();
+  await backgroundConnection.startSendingPatches();
 
   setupStateHooks(store);
 
@@ -137,8 +137,10 @@ export async function setupInitialStore(metamaskState, activeTab) {
       en: enLocaleMessages,
     },
   };
-
-  if (getEnvironmentType() === ENVIRONMENT_TYPE_POPUP) {
+  if (
+    getEnvironmentType() === ENVIRONMENT_TYPE_POPUP ||
+    getEnvironmentType() === ENVIRONMENT_TYPE_SIDEPANEL
+  ) {
     const { origin } = draftInitialState.activeTab;
     const permittedAccountsForCurrentTab =
       getAllPermittedAccountsForCurrentTab(draftInitialState);
@@ -237,6 +239,22 @@ async function startApp(metamaskState, opts) {
 async function runInitialActions(store) {
   const initialState = store.getState();
 
+  // Update browser environment with accurate browser detection from UI
+  // This corrects the initial detection from background which can't detect Brave
+  try {
+    const browserName = getBrowserName().toLowerCase();
+    const { os } = initialState.metamask.browserEnvironment || {};
+    if (os && browserName) {
+      store
+        .dispatch(actions.setBrowserEnvironment(os, browserName))
+        .catch((err) => {
+          log.error('Failed to update browser environment:', err);
+        });
+    }
+  } catch (error) {
+    log.error('Failed to get browser name:', error);
+  }
+
   // This block autoswitches chains based on the last chain used
   // for a given dapp, when there are no pending confimrations
   // This allows the user to be connected on one chain
@@ -266,8 +284,15 @@ async function runInitialActions(store) {
     };
     await validateSeedlessPasswordOutdated(initialState);
     // periodically check seedless password outdated when app UI is open
-    setInterval(() => {
+    const pwdCheckIntervalId = setInterval(() => {
       const state = store.getState();
+      const firstTimeFlowType = getFirstTimeFlowType(state);
+      const isSocialLoginFlow = getIsSocialLoginFlow(state);
+      if (firstTimeFlowType !== null && !isSocialLoginFlow) {
+        // if the onboarding type is not social login, after wallet reset, we should stop checking for password outdated
+        clearInterval(pwdCheckIntervalId);
+        return;
+      }
       validateSeedlessPasswordOutdated(state);
     }, SEEDLESS_PASSWORD_OUTDATED_CHECK_INTERVAL_MS);
   } catch (e) {
@@ -351,6 +376,15 @@ function setupStateHooks(store) {
     };
   }
 
+  /**
+   * Reload the extension.
+   *
+   * This is used for the `first-install` E2E test, which uses a production-like build. This
+   * function must be present even if `process.env.IN_TEST` is false.
+   */
+  window.stateHooks.reloadExtension = () => {
+    browser.runtime.reload();
+  };
   window.stateHooks.getCleanAppState = async function () {
     return getCleanAppState(store);
   };

@@ -6,17 +6,9 @@ import {
   AlignItems,
   Display,
   FlexWrap,
-  IconColor,
-  JustifyContent,
   TextVariant,
 } from '../../../helpers/constants/design-system';
-import {
-  Box,
-  ButtonIcon,
-  ButtonIconSize,
-  IconName,
-  SensitiveText,
-} from '../../component-library';
+import { Box, SensitiveText } from '../../component-library';
 import {
   getCurrentCurrency,
   getTokenBalances,
@@ -31,7 +23,6 @@ import {
   getEnabledNetworksByNamespace,
   getPreferences,
   getSelectedInternalAccount,
-  isGlobalNetworkSelectorRemoved,
   selectAnyEnabledNetworksAreAvailable,
 } from '../../../selectors';
 import {
@@ -69,9 +60,8 @@ export const AggregatedBalance = ({
     selectAnyEnabledNetworksAreAvailable,
   );
 
-  const showNativeTokenAsMain = isGlobalNetworkSelectorRemoved
-    ? showNativeTokenAsMainBalance && Object.keys(enabledNetworks).length === 1
-    : showNativeTokenAsMainBalance;
+  const showNativeTokenAsMain =
+    showNativeTokenAsMainBalance && Object.keys(enabledNetworks).length === 1;
 
   const multichainNativeTokenBalance = useSelector((state) =>
     getMultichainNativeTokenBalance(state, selectedAccount),
@@ -130,6 +120,8 @@ export const AggregatedBalance = ({
           variant={TextVariant.inherit}
           isHidden={privacyMode}
           data-testid="account-value-and-suffix"
+          onClick={handleSensitiveToggle}
+          className="cursor-pointer transition-colors duration-200 hover:text-text-alternative"
         >
           {showNativeTokenAsMain || !isNonEvmRatesAvailable || !shouldShowFiat
             ? formattedTokenDisplay
@@ -139,22 +131,13 @@ export const AggregatedBalance = ({
           marginInlineStart={privacyMode ? 0 : 1}
           variant={TextVariant.inherit}
           isHidden={privacyMode}
+          onClick={handleSensitiveToggle}
+          className="cursor-pointer transition-colors duration-200 hover:text-text-alternative"
         >
           {showNativeTokenAsMain || !isNonEvmRatesAvailable || !shouldShowFiat
             ? currentNetwork.network.ticker
             : currentCurrency.toUpperCase()}
         </SensitiveText>
-
-        <ButtonIcon
-          color={IconColor.iconAlternative}
-          marginLeft={2}
-          size={ButtonIconSize.Md}
-          onClick={handleSensitiveToggle}
-          iconName={privacyMode ? IconName.EyeSlash : IconName.Eye}
-          justifyContent={JustifyContent.center}
-          ariaLabel="Sensitive toggle"
-          data-testid="sensitive-toggle"
-        />
       </Box>
     </Skeleton>
   );

@@ -1,16 +1,17 @@
 import mockState from '../../../../../test/data/mock-state.json';
 import {
+  BITCOIN_ASSET,
   EVM_ASSET,
   EVM_NATIVE_ASSET,
   SOLANA_ASSET,
   SOLANA_NATIVE_ASSET,
 } from '../../../../../test/data/send/assets';
-import { renderHookWithProvider } from '../../../../../test/lib/render-helpers';
+import { renderHookWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 import * as SendContext from '../../context/send';
 import { useSendType } from './useSendType';
 
-jest.mock('react-router-dom-v5-compat', () => ({
-  ...jest.requireActual('react-router-dom-v5-compat'),
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
   useLocation: () => ({ pathname: '/send/asset' }),
   useSearchParams: () => [{ get: () => null }],
 }));
@@ -32,11 +33,13 @@ describe('useSendType', () => {
     } as unknown as SendContext.SendContextType);
     const result = renderHook();
     expect(result).toEqual({
+      isBitcoinSendType: false,
       isEvmNativeSendType: false,
       isEvmSendType: true,
       isNonEvmNativeSendType: false,
       isNonEvmSendType: false,
       isSolanaSendType: false,
+      isTronSendType: false,
     });
   });
 
@@ -47,11 +50,13 @@ describe('useSendType', () => {
     } as unknown as SendContext.SendContextType);
     const result = renderHook();
     expect(result).toEqual({
+      isBitcoinSendType: false,
       isEvmNativeSendType: false,
       isEvmSendType: true,
       isNonEvmNativeSendType: false,
       isNonEvmSendType: false,
       isSolanaSendType: false,
+      isTronSendType: false,
     });
   });
 
@@ -62,11 +67,13 @@ describe('useSendType', () => {
     } as unknown as SendContext.SendContextType);
     const result = renderHook();
     expect(result).toEqual({
+      isBitcoinSendType: false,
       isEvmNativeSendType: true,
       isEvmSendType: true,
       isNonEvmNativeSendType: false,
       isNonEvmSendType: false,
       isSolanaSendType: false,
+      isTronSendType: false,
     });
   });
 
@@ -77,11 +84,13 @@ describe('useSendType', () => {
     } as unknown as SendContext.SendContextType);
     const result = renderHook();
     expect(result).toEqual({
+      isBitcoinSendType: false,
       isEvmNativeSendType: false,
       isEvmSendType: false,
       isNonEvmNativeSendType: true,
       isNonEvmSendType: true,
       isSolanaSendType: true,
+      isTronSendType: false,
     });
   });
 
@@ -92,11 +101,30 @@ describe('useSendType', () => {
     } as unknown as SendContext.SendContextType);
     const result = renderHook();
     expect(result).toEqual({
+      isBitcoinSendType: false,
       isEvmNativeSendType: false,
       isEvmSendType: false,
       isNonEvmNativeSendType: false,
       isNonEvmSendType: true,
       isSolanaSendType: true,
+      isTronSendType: false,
+    });
+  });
+
+  it('return correct type for bitcoin asset send', () => {
+    jest.spyOn(SendContext, 'useSendContext').mockReturnValue({
+      asset: BITCOIN_ASSET,
+      chainId: BITCOIN_ASSET.chainId,
+    } as unknown as SendContext.SendContextType);
+    const result = renderHook();
+    expect(result).toEqual({
+      isBitcoinSendType: true,
+      isEvmNativeSendType: false,
+      isEvmSendType: false,
+      isNonEvmNativeSendType: true,
+      isNonEvmSendType: true,
+      isSolanaSendType: false,
+      isTronSendType: false,
     });
   });
 });

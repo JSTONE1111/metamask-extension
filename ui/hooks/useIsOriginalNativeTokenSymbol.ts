@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { CaipChainId, Hex } from '@metamask/utils';
-import { useSafeChainsListValidationSelector } from '../selectors';
+import { getUseSafeChainsListValidation } from '../selectors';
 import { getMultichainCurrentNetwork } from '../selectors/multichain';
 import { isEvmChainId } from '../../shared/lib/asset-utils';
 
@@ -18,13 +18,15 @@ export function useIsOriginalNativeTokenSymbol(
 ) {
   const [isOriginalNativeSymbol, setIsOriginalNativeSymbol] = useState(false);
   const useSafeChainsListValidation = useSelector(
-    useSafeChainsListValidationSelector,
+    getUseSafeChainsListValidation,
   );
 
   const isEvm = isEvmChainId(chainId);
   const providerConfig = useSelector(getMultichainCurrentNetwork);
 
   useEffect(() => {
+    let isMounted = true;
+
     const isLocalhost = (urlString: string) => {
       const url = getValidUrl(urlString);
 
@@ -53,13 +55,21 @@ export function useIsOriginalNativeTokenSymbol(
           useAPICall: useSafeChainsListValidation,
         });
 
-        setIsOriginalNativeSymbol(isOriginalNativeToken);
+        if (isMounted) {
+          setIsOriginalNativeSymbol(isOriginalNativeToken);
+        }
       } catch (err) {
-        setIsOriginalNativeSymbol(false);
+        if (isMounted) {
+          setIsOriginalNativeSymbol(false);
+        }
       }
     }
 
     getNativeTokenSymbol(chainId);
+
+    return () => {
+      isMounted = false;
+    };
   }, [
     isOriginalNativeSymbol,
     chainId,

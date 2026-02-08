@@ -147,9 +147,6 @@
   "etherscanView": {
     "message": "Gade kont sou Etherscan"
   },
-  "expandView": {
-    "message": "Elaji Wè"
-  },
   "failed": {
     "message": "Tonbe"
   },
@@ -272,9 +269,6 @@
   "needImportFile": {
     "message": "Ou dwe chwazi yon dosye pou enpòte.",
     "description": "User is important an account and needs to add a file to continue"
-  },
-  "negativeETH": {
-    "message": "Pa ka voye kantite lajan negatif ETH."
   },
   "networks": {
     "message": "Rezo"

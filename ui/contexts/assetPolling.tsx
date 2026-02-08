@@ -1,9 +1,9 @@
 import React, { ReactNode } from 'react';
 import useCurrencyRatePolling from '../hooks/useCurrencyRatePolling';
 import useTokenRatesPolling from '../hooks/useTokenRatesPolling';
-import useAccountTrackerPolling from '../hooks/useAccountTrackerPolling';
 import useTokenDetectionPolling from '../hooks/useTokenDetectionPolling';
 import useTokenListPolling from '../hooks/useTokenListPolling';
+import useStaticTokensPollingHook from '../hooks/useStaticTokensPolling';
 import useDeFiPolling from '../hooks/defi/useDeFiPolling';
 import useMultichainAssetsRatesPolling from '../hooks/useMultichainAssetsRatesPolling';
 
@@ -13,11 +13,11 @@ import useMultichainAssetsRatesPolling from '../hooks/useMultichainAssetsRatesPo
 export const AssetPollingProvider = ({ children }: { children: ReactNode }) => {
   useCurrencyRatePolling();
   useTokenRatesPolling();
-  useAccountTrackerPolling();
   useTokenDetectionPolling();
   useTokenListPolling();
   useDeFiPolling();
   useMultichainAssetsRatesPolling();
+  useStaticTokensPollingHook();
 
   return <>{children}</>;
 };

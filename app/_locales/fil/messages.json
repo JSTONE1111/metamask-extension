@@ -208,9 +208,6 @@
   "etherscanView": {
     "message": "Tingnan ang account sa Etherscan"
   },
-  "expandView": {
-    "message": "I-expand ang View"
-  },
   "failed": {
     "message": "Nabigo"
   },
@@ -332,9 +329,6 @@
   "needImportFile": {
     "message": "Dapat kang pumili ng file na ii-import.",
     "description": "User is important an account and needs to add a file to continue"
-  },
-  "negativeETH": {
-    "message": "Hindi makakapagpadala ng mga negative na halaga ng ETH."
   },
   "networkName": {
     "message": "Pangalan ng Network"

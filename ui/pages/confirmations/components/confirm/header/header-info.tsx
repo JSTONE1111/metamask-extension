@@ -45,7 +45,7 @@ import { getHDEntropyIndex } from '../../../../../selectors/selectors';
 import { AdvancedDetailsButton } from './advanced-details-button';
 
 const HeaderInfo = () => {
-  const trackEvent = useContext(MetaMetricsContext);
+  const { trackEvent } = useContext(MetaMetricsContext);
   const hdEntropyIndex = useSelector(getHDEntropyIndex);
 
   const [showAccountInfo, setShowAccountInfo] = React.useState(false);
@@ -109,6 +109,7 @@ const HeaderInfo = () => {
       <Box
         display={Display.Flex}
         justifyContent={JustifyContent.flexEnd}
+        gap={4}
         style={{
           alignSelf: 'flex-end',
         }}

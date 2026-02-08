@@ -9,8 +9,13 @@ import React, {
 import browser from 'webextension-polyfill';
 
 import { useDispatch, useSelector } from 'react-redux';
-import { useHistory } from 'react-router-dom';
-import { Link } from 'react-router-dom-v5-compat';
+import { useNavigate } from 'react-router-dom';
+import {
+  Icon,
+  IconName,
+  IconSize,
+  IconColor,
+} from '@metamask/design-system-react';
 import {
   AlignItems,
   BackgroundColor,
@@ -18,7 +23,7 @@ import {
   BorderRadius,
   Display,
   FlexDirection,
-  IconColor,
+  IconColor as IconColorDeprecated,
   JustifyContent,
   TextColor,
   TextVariant,
@@ -29,19 +34,17 @@ import {
   ButtonBaseSize,
   ButtonIcon,
   ButtonIconSize,
-  IconName,
-  IconSize,
+  IconName as IconNameDeprecated,
+  IconSize as IconSizeDeprecated,
   Text,
 } from '../../component-library';
+import { MultichainHoveredAddressRowsList } from '../../multichain-accounts/multichain-address-rows-hovered-list';
 import {
   MetaMetricsEventName,
   MetaMetricsEventCategory,
 } from '../../../../shared/constants/metametrics';
 import { useI18nContext } from '../../../hooks/useI18nContext';
-import {
-  setShowSupportDataConsentModal,
-  toggleAccountMenu,
-} from '../../../store/actions';
+import { setShowSupportDataConsentModal } from '../../../store/actions';
 import ConnectedStatusIndicator from '../../app/connected-status-indicator';
 import { AccountPicker } from '../account-picker';
 import { GlobalMenu } from '../global-menu';
@@ -57,14 +60,16 @@ import { getEnvironmentType } from '../../../../app/scripts/lib/util';
 // eslint-disable-next-line import/no-restricted-paths
 import { normalizeSafeAddress } from '../../../../app/scripts/lib/multichain/address';
 import { shortenAddress } from '../../../helpers/utils/util';
-import { ENVIRONMENT_TYPE_POPUP } from '../../../../shared/constants/app';
+import {
+  ENVIRONMENT_TYPE_POPUP,
+  ENVIRONMENT_TYPE_SIDEPANEL,
+} from '../../../../shared/constants/app';
 import { MetaMetricsContext } from '../../../contexts/metametrics';
 import { useCopyToClipboard } from '../../../hooks/useCopyToClipboard';
 import { NotificationsTagCounter } from '../notifications-tag-counter';
 import {
   ACCOUNT_LIST_PAGE_ROUTE,
   REVIEW_PERMISSIONS,
-  MULTICHAIN_ACCOUNT_ADDRESS_LIST_PAGE_ROUTE,
 } from '../../../helpers/constants/routes';
 import VisitSupportDataConsentModal from '../../app/modals/visit-support-data-consent-modal';
 import {
@@ -74,10 +79,12 @@ import {
 import { PreferredAvatar } from '../../app/preferred-avatar';
 import { AccountIconTour } from '../../app/account-icon-tour/account-icon-tour';
 import {
+  getAccountListStats,
   getMultichainAccountGroupById,
   getSelectedAccountGroup,
-  getNetworkAddressCount,
 } from '../../../selectors/multichain-accounts/account-tree';
+import { trace, TraceName, TraceOperation } from '../../../../shared/lib/trace';
+import { MultichainAccountNetworkGroup } from '../../multichain-accounts/multichain-account-network-group';
 
 type AppHeaderUnlockedContentProps = {
   disableAccountPicker: boolean;
@@ -88,9 +95,9 @@ export const AppHeaderUnlockedContent = ({
   disableAccountPicker,
   menuRef,
 }: AppHeaderUnlockedContentProps) => {
-  const trackEvent = useContext(MetaMetricsContext);
+  const { trackEvent } = useContext(MetaMetricsContext);
   const t = useI18nContext();
-  const history = useHistory();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const origin = useSelector(getOriginOfCurrentTab);
   const [accountOptionsMenuOpen, setAccountOptionsMenuOpen] = useState(false);
@@ -102,9 +109,7 @@ export const AppHeaderUnlockedContent = ({
   const selectedMultichainAccount = useSelector((state) =>
     getMultichainAccountGroupById(state, selectedMultichainAccountId),
   );
-  const numberOfAccountsInGroup = useSelector((state) =>
-    getNetworkAddressCount(state, selectedMultichainAccountId),
-  );
+  const accountListStats = useSelector(getAccountListStats);
 
   // Used for account picker
   const internalAccount = useSelector(getSelectedInternalAccount);
@@ -112,16 +117,18 @@ export const AppHeaderUnlockedContent = ({
     internalAccount &&
     shortenAddress(normalizeSafeAddress(internalAccount.address));
   const accountName = isMultichainAccountsState2Enabled
-    ? selectedMultichainAccount.metadata.name
-    : internalAccount.metadata.name;
+    ? (selectedMultichainAccount?.metadata.name ?? '')
+    : (internalAccount?.metadata.name ?? '');
 
   // During onboarding there is no selected internal account
   const currentAddress = internalAccount?.address;
 
   // Passing non-evm address to checksum function will throw an error
   const normalizedCurrentAddress = normalizeSafeAddress(currentAddress);
-  const [copied, handleCopy, resetCopyState] = useCopyToClipboard(2000, {
-    expireClipboard: false,
+
+  // useCopyToClipboard analysis: Copies a public address
+  const [copied, handleCopy, resetCopyState] = useCopyToClipboard({
+    clearDelayMs: null,
   });
 
   const showSupportDataConsentModal = useSelector(
@@ -144,8 +151,8 @@ export const AppHeaderUnlockedContent = ({
   }, [copied, dispatch]);
 
   const showConnectedStatus =
-    getEnvironmentType() === ENVIRONMENT_TYPE_POPUP &&
-    origin &&
+    (getEnvironmentType() === ENVIRONMENT_TYPE_POPUP ||
+      getEnvironmentType() === ENVIRONMENT_TYPE_SIDEPANEL) &&
     origin !== browser.runtime.id;
 
   const handleMainMenuToggle = () => {
@@ -166,7 +173,7 @@ export const AppHeaderUnlockedContent = ({
   };
 
   const handleConnectionsRoute = () => {
-    history.push(`${REVIEW_PERMISSIONS}/${encodeURIComponent(origin)}`);
+    navigate(`${REVIEW_PERMISSIONS}/${encodeURIComponent(origin)}`);
   };
 
   const handleCopyClick = useCallback(() => {
@@ -181,10 +188,12 @@ export const AppHeaderUnlockedContent = ({
         size={ButtonBaseSize.Sm}
         backgroundColor={BackgroundColor.transparent}
         borderRadius={BorderRadius.LG}
-        endIconName={copied ? IconName.CopySuccess : IconName.Copy}
+        endIconName={
+          copied ? IconNameDeprecated.CopySuccess : IconNameDeprecated.Copy
+        }
         endIconProps={{
-          color: IconColor.iconAlternative,
-          size: IconSize.Sm,
+          color: IconColorDeprecated.iconAlternative,
+          size: IconSizeDeprecated.Sm,
         }}
         paddingLeft={2}
         paddingRight={2}
@@ -211,11 +220,6 @@ export const AppHeaderUnlockedContent = ({
   );
 
   const multichainAccountAppContent = useMemo(() => {
-    const networksLabel =
-      numberOfAccountsInGroup === 1
-        ? t('networkAddress')
-        : t('networkAddresses', [numberOfAccountsInGroup]);
-
     return (
       <Box style={{ overflow: 'hidden' }}>
         {/* Prevent overflow of account picker by long account names */}
@@ -231,12 +235,25 @@ export const AppHeaderUnlockedContent = ({
             name={accountName}
             showAvatarAccount={false}
             onClick={() => {
-              history.push(ACCOUNT_LIST_PAGE_ROUTE);
+              trace({
+                name: TraceName.ShowAccountList,
+                op: TraceOperation.AccountUi,
+              });
+              navigate(ACCOUNT_LIST_PAGE_ROUTE);
               trackEvent({
                 event: MetaMetricsEventName.NavAccountMenuOpened,
                 category: MetaMetricsEventCategory.Navigation,
                 properties: {
                   location: 'Home',
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  pinned_count: accountListStats.pinnedCount,
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  hidden_count: accountListStats.hiddenCount,
+                  // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                  // eslint-disable-next-line @typescript-eslint/naming-convention
+                  total_accounts: accountListStats.totalAccounts,
                 },
               });
             }}
@@ -246,19 +263,38 @@ export const AppHeaderUnlockedContent = ({
           />
           <>{!isMultichainAccountsState2Enabled && CopyButton}</>
         </Text>
-        <Link
-          to={`${MULTICHAIN_ACCOUNT_ADDRESS_LIST_PAGE_ROUTE}/${encodeURIComponent(selectedMultichainAccountId)}`}
-          data-testid="networks-subtitle-test-id"
-        >
-          <Text
-            className="networks-subtitle"
-            color={TextColor.textAlternative}
-            variant={TextVariant.bodyXsMedium}
-            paddingInline={2}
+        {selectedMultichainAccountId && (
+          <Box
+            marginTop={1}
+            marginLeft={2}
+            padding={1}
+            borderRadius={BorderRadius.LG}
+            backgroundColor={BackgroundColor.backgroundMuted}
+            style={{ width: 'fit-content' }}
+            data-testid="networks-subtitle-test-id"
           >
-            {networksLabel}
-          </Text>
-        </Link>
+            <MultichainHoveredAddressRowsList
+              groupId={selectedMultichainAccountId}
+              showAccountHeaderAndBalance={false}
+              onViewAllClick={() => {
+                trace({
+                  name: TraceName.ShowAccountAddressList,
+                  op: TraceOperation.AccountUi,
+                });
+              }}
+            >
+              <MultichainAccountNetworkGroup
+                groupId={selectedMultichainAccountId}
+                limit={4}
+              />
+              <Icon
+                name={IconName.Copy}
+                size={IconSize.Sm}
+                color={IconColor.IconAlternative}
+              />
+            </MultichainHoveredAddressRowsList>
+          </Box>
+        )}
       </Box>
     );
   }, [
@@ -266,27 +302,28 @@ export const AppHeaderUnlockedContent = ({
     accountName,
     disableAccountPicker,
     selectedMultichainAccountId,
-    history,
+    navigate,
     isMultichainAccountsState2Enabled,
-    numberOfAccountsInGroup,
-    t,
     trackEvent,
+    accountListStats,
   ]);
 
   // TODO: [Multichain-Accounts-MUL-849] Delete this method once multichain accounts is released
   const AppContent = useMemo(() => {
     const handleAccountMenuClick = () => {
-      if (isMultichainAccountsState2Enabled) {
-        history.push(ACCOUNT_LIST_PAGE_ROUTE);
-      } else {
-        dispatch(toggleAccountMenu());
-      }
+      trace({
+        name: TraceName.ShowAccountList,
+        op: TraceOperation.AccountUi,
+      });
+      navigate(ACCOUNT_LIST_PAGE_ROUTE);
     };
 
     return (
       <>
         <div ref={tourAnchorRef} className="flex">
-          <PreferredAvatar address={internalAccount.address} />
+          {internalAccount && (
+            <PreferredAvatar address={internalAccount.address} />
+          )}
         </div>
 
         {internalAccount && (
@@ -309,6 +346,15 @@ export const AppHeaderUnlockedContent = ({
                   category: MetaMetricsEventCategory.Navigation,
                   properties: {
                     location: 'Home',
+                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                    // eslint-disable-next-line @typescript-eslint/naming-convention
+                    pinned_count: accountListStats.pinnedCount,
+                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                    // eslint-disable-next-line @typescript-eslint/naming-convention
+                    hidden_count: accountListStats.hiddenCount,
+                    // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
+                    // eslint-disable-next-line @typescript-eslint/naming-convention
+                    total_accounts: accountListStats.totalAccounts,
                   },
                 });
               }}
@@ -326,10 +372,9 @@ export const AppHeaderUnlockedContent = ({
     accountName,
     disableAccountPicker,
     CopyButton,
-    isMultichainAccountsState2Enabled,
-    history,
-    dispatch,
+    navigate,
     trackEvent,
+    accountListStats,
   ]);
 
   return (
@@ -372,7 +417,7 @@ export const AppHeaderUnlockedContent = ({
               </Box>
             )}
             <ButtonIcon
-              iconName={IconName.Menu}
+              iconName={IconNameDeprecated.Menu}
               data-testid="account-options-menu-button"
               ariaLabel={t('accountOptions')}
               onClick={handleMainMenuToggle}

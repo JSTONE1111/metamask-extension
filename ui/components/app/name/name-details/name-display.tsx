@@ -18,6 +18,14 @@ export type NameDisplayProps = {
   variation: string;
   handleClick?: () => void;
   showFullName?: boolean;
+  /**
+   * The fallback value to display if the name is not found or cannot be resolved.
+   */
+  fallbackName?: string;
+  /**
+   * Whether to disable the onClick handler.
+   */
+  disableNameClick?: boolean;
 };
 
 const NameDisplay = memo(
@@ -28,9 +36,11 @@ const NameDisplay = memo(
     variation,
     handleClick,
     showFullName = false,
+    fallbackName,
+    disableNameClick,
     ...props
   }: NameDisplayProps) => {
-    const { name, image, icon, displayState } = useDisplayName({
+    const { name, image, icon, displayState, isAccount } = useDisplayName({
       value,
       type,
       preferContractSymbol,
@@ -64,11 +74,12 @@ const NameDisplay = memo(
     };
 
     const renderName = () => {
-      if (!name) {
+      const nameWithFallbackValue = name || fallbackName;
+      if (!nameWithFallbackValue) {
         return <FormattedName value={value} type={type} {...props} />;
       }
 
-      if (showFullName) {
+      if (name && showFullName) {
         return (
           <Text className="name__name" variant={TextVariant.bodyMd} {...props}>
             {name}
@@ -76,7 +87,7 @@ const NameDisplay = memo(
         );
       }
 
-      return <ShortenedName name={name} {...props} />;
+      return <ShortenedName name={nameWithFallbackValue} {...props} />;
     };
 
     return (
@@ -85,7 +96,8 @@ const NameDisplay = memo(
           name: true,
           // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
           // eslint-disable-next-line @typescript-eslint/naming-convention
-          name__clickable: Boolean(handleClick),
+          name__clickable:
+            Boolean(handleClick) && !isAccount && !disableNameClick,
           // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31860
           // eslint-disable-next-line @typescript-eslint/naming-convention
           name__saved: displayState === TrustSignalDisplayState.Petname,

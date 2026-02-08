@@ -229,14 +229,8 @@
   "enterPasswordContinue": {
     "message": "Ievadiet paroli, lai turpinātu"
   },
-  "ethereumPublicAddress": {
-    "message": "Ethereum publiskā adrese"
-  },
   "etherscanView": {
     "message": "Skatīt kontu ar Etherscan"
-  },
-  "expandView": {
-    "message": "Izvērst skatījumu"
   },
   "failed": {
     "message": "Neizdevās"
@@ -390,9 +384,6 @@
   "needImportFile": {
     "message": "Jums jāatlasa fails, ko importēt",
     "description": "User is important an account and needs to add a file to continue"
-  },
-  "negativeETH": {
-    "message": "Nav iespējams nosūtīt negatīvu ETH summu."
   },
   "networkName": {
     "message": "Tīkla nosaukums"

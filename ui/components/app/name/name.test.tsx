@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { NameType } from '@metamask/name-controller';
+import { fireEvent } from '@testing-library/react';
 import configureStore from 'redux-mock-store';
-import { renderWithProvider } from '../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { MetaMetricsContext } from '../../../contexts/metametrics';
 import {
   MetaMetricsEventCategory,
@@ -21,6 +22,10 @@ jest.mock('react-redux', () => ({
   ...jest.requireActual('react-redux'),
   useDispatch: () => jest.fn(),
 }));
+
+jest.mock('./name-details/name-details', () => {
+  return <div data-testid="name-details">NameDetails</div>;
+});
 
 const ADDRESS_NO_SAVED_NAME_MOCK = '0xc0ffee254729296a45a3885639ac7e10f9d54977';
 const ADDRESS_SAVED_NAME_MOCK = '0xc0ffee254729296a45a3885639ac7e10f9d54979';
@@ -50,6 +55,7 @@ describe('Name', () => {
         name: IconName.Question,
         color: undefined,
       },
+      isAccount: false,
     });
 
     const { container } = renderWithProvider(
@@ -73,6 +79,7 @@ describe('Name', () => {
         name: IconName.Question,
         color: undefined,
       },
+      isAccount: false,
     });
 
     const { container } = renderWithProvider(
@@ -96,6 +103,7 @@ describe('Name', () => {
         name: IconName.VerifiedFilled,
         color: IconColor.infoDefault,
       },
+      isAccount: false,
     });
 
     const { container } = renderWithProvider(
@@ -119,6 +127,7 @@ describe('Name', () => {
         name: IconName.VerifiedFilled,
         color: IconColor.infoDefault,
       },
+      isAccount: false,
     });
 
     const { container } = renderWithProvider(
@@ -143,6 +152,7 @@ describe('Name', () => {
         name: IconName.VerifiedFilled,
         color: IconColor.infoDefault,
       },
+      isAccount: false,
     });
 
     const { container } = renderWithProvider(
@@ -157,6 +167,34 @@ describe('Name', () => {
     expect(container).toMatchSnapshot();
   });
 
+  it('prevents opening name details modal for account', () => {
+    useDisplayNameMock.mockReturnValue({
+      name: SAVED_NAME_MOCK,
+      hasPetname: true,
+      image: 'test-image',
+      displayState: TrustSignalDisplayState.Petname,
+      icon: {
+        name: IconName.VerifiedFilled,
+        color: IconColor.infoDefault,
+      },
+      isAccount: true,
+    });
+
+    const { getByTestId, queryByTestId } = renderWithProvider(
+      <Name
+        type={NameType.ETHEREUM_ADDRESS}
+        value={ADDRESS_SAVED_NAME_MOCK}
+        variation={VARIATION_MOCK}
+        data-testid="name-component"
+      />,
+      store,
+    );
+
+    const nameComponent = getByTestId('name-component');
+    fireEvent.click(nameComponent);
+    expect(queryByTestId('name-details')).toBeNull();
+  });
+
   describe('metrics', () => {
     // @ts-expect-error This is missing from the Mocha type definitions
     it.each([
@@ -166,6 +204,12 @@ describe('Name', () => {
       'sends displayed event with %s name',
       async (_: string, value: string, hasPetname: boolean) => {
         const trackEventMock = jest.fn();
+        const mockMetaMetricsContext = {
+          trackEvent: trackEventMock,
+          bufferedTrace: jest.fn(),
+          bufferedEndTrace: jest.fn(),
+          onboardingParentContext: { current: null },
+        };
 
         useDisplayNameMock.mockReturnValue({
           name: hasPetname ? SAVED_NAME_MOCK : null,
@@ -177,10 +221,11 @@ describe('Name', () => {
             name: IconName.VerifiedFilled,
             color: IconColor.infoDefault,
           },
+          isAccount: false,
         });
 
         renderWithProvider(
-          <MetaMetricsContext.Provider value={trackEventMock}>
+          <MetaMetricsContext.Provider value={mockMetaMetricsContext}>
             <Name
               type={NameType.ETHEREUM_ADDRESS}
               value={value}

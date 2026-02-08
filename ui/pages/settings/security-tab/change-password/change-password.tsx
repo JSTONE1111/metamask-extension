@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom-v5-compat';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -53,7 +53,7 @@ const ChangePassword = () => {
   const t = useI18nContext();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const trackEvent = useContext(MetaMetricsContext);
+  const { trackEvent } = useContext(MetaMetricsContext);
   const isSocialLoginFlow = useSelector(getIsSocialLoginFlow);
   const animationEventEmitter = useRef(new EventEmitter());
   const [step, setStep] = useState(ChangePasswordSteps.VerifyCurrentPassword);
@@ -235,7 +235,7 @@ const ChangePassword = () => {
               as="h2"
             >
               {isSocialLoginFlow
-                ? t('createPasswordDetailsSocial')
+                ? t('changePasswordDetailsSocial')
                 : t('createPasswordDetails')}
             </Text>
             <PasswordForm

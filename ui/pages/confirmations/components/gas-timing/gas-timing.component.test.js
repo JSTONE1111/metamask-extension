@@ -1,7 +1,7 @@
 import React from 'react';
 import configureMockStore from 'redux-mock-store';
 import { waitFor } from '@testing-library/react';
-import { renderWithProvider } from '../../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../../test/lib/render-helpers-navigate';
 
 import { GasEstimateTypes } from '../../../../../shared/constants/gas';
 import mockState from '../../../../../test/data/mock-state.json';
@@ -25,7 +25,6 @@ describe('Gas timing', () => {
   it('renders nothing when gas is loading', () => {
     // Fails the networkAndAccountSupports1559 check
     const nullGasState = {
-      send: { draftTransactions: {} },
       metamask: {
         gasFeeEstimates: null,
         gasEstimateType: GasEstimateTypes.feeMarket,
@@ -48,7 +47,7 @@ describe('Gas timing', () => {
     const screen = renderWithProvider(<GasTiming {...props} />, mockStore);
 
     await waitFor(() => {
-      expect(screen.queryByText('🦊 Market')).toBeTruthy();
+      expect(screen.queryByText('Market')).toBeTruthy();
       expect(screen.getByTestId('gas-timing-time')).toBeInTheDocument();
     });
   });
@@ -66,7 +65,7 @@ describe('Gas timing', () => {
     const screen = renderWithProvider(<GasTiming {...props} />, mockStore);
 
     await waitFor(() => {
-      expect(screen.queryByText('⬆ 10% increase')).toBeTruthy();
+      expect(screen.queryByText('10% increase')).toBeTruthy();
     });
   });
 });

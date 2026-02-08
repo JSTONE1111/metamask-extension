@@ -6,10 +6,9 @@ import {
   EditGasModes,
   GasEstimateTypes,
 } from '../../../../shared/constants/gas';
-import { renderWithProvider } from '../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import mockEstimates from '../../../../test/data/mock-estimates.json';
 import mockState from '../../../../test/data/mock-state.json';
-import { GasFeeContextProvider } from '../../../contexts/gasFee';
 import configureStore from '../../../store/store';
 import InfoTooltip from '../../ui/info-tooltip';
 import {
@@ -106,7 +105,7 @@ const render = (
   });
 
   return renderWithProvider(
-    <GasFeeContextProvider
+    <CancelSpeedupPopover
       transaction={{
         userFeeLevel: 'tenPercentIncreased',
         txParams: {
@@ -117,9 +116,7 @@ const render = (
       }}
       editGasMode={EditGasModes.cancel}
       {...props}
-    >
-      <CancelSpeedupPopover />
-    </GasFeeContextProvider>,
+    />,
     store,
   );
 };
@@ -129,14 +126,14 @@ describe('CancelSpeedupPopover', () => {
     jest.clearAllMocks();
   });
 
-  it('should have ❌Cancel in header if editGasMode is cancel', async () => {
+  it('should have Cancel in header if editGasMode is cancel', async () => {
     await act(async () => render());
-    expect(screen.queryByText('❌Cancel')).toBeInTheDocument();
+    expect(screen.queryByText('Cancel')).toBeInTheDocument();
   });
 
-  it('should have 🚀Speed up in header if editGasMode is speedup', async () => {
+  it('should have Speed up in header if editGasMode is speedup', async () => {
     await act(async () => render({ editGasMode: EditGasModes.speedUp }));
-    expect(screen.queryByText('🚀Speed up')).toBeInTheDocument();
+    expect(screen.queryByText('Speed up')).toBeInTheDocument();
   });
 
   it('information tooltip should contain the correct text if editGasMode is cancel', async () => {

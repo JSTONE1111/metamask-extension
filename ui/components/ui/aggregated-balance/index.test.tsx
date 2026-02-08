@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import thunk from 'redux-thunk';
 import { SolAccountType, SolMethod, SolScope } from '@metamask/keyring-api';
 import { Cryptocurrency } from '@metamask/assets-controllers';
-import { renderWithProvider } from '../../../../test/lib/render-helpers';
+import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import { MultichainNativeAssets } from '../../../../shared/constants/multichain/assets';
 import mockState from '../../../../test/data/mock-state.json';
 import { SOLANA_WALLET_SNAP_ID } from '../../../../shared/lib/accounts';
@@ -51,6 +51,11 @@ const mockMetamaskStore = {
       [mockNonEvmAccount.id]: mockNonEvmAccount,
     },
   },
+  enabledNetworkMap: {
+    solana: {
+      [SolScope.Mainnet]: true,
+    },
+  },
   preferences: {
     showNativeTokenAsMainBalance: false,
     tokenNetworkFilter: {},
@@ -76,8 +81,8 @@ const mockMetamaskStore = {
   },
   cryptocurrencies: [Cryptocurrency.Solana],
   remoteFeatureFlags: {
-    addSolanaAccount: true,
-    addBitcoinAccount: true,
+    solanaAccounts: { enabled: true, minimumVersion: '13.6.0' },
+    bitcoinAccounts: { enabled: true, minimumVersion: '13.6.0' },
   },
 };
 

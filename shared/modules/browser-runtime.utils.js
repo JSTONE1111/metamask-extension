@@ -78,6 +78,7 @@ export function getIsBrowserPrerenderBroken(
     false
   );
 }
+
 /**
  * Returns the name of the browser
  *

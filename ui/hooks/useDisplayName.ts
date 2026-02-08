@@ -21,7 +21,6 @@ import {
   getAccountTree,
 } from '../selectors/multichain-accounts/account-tree';
 import { useNames } from './useName';
-import { useNftCollectionsMetadata } from './useNftCollectionsMetadata';
 import { TrustSignalDisplayState, useTrustSignals } from './useTrustSignals';
 
 export type UseDisplayNameRequest = {
@@ -37,6 +36,7 @@ export type UseDisplayNameResponse = {
   contractDisplayName?: string;
   image?: string;
   icon?: IconProps | null;
+  isAccount: boolean;
   displayState: TrustSignalDisplayState;
   subtitle?: string | null;
 };
@@ -48,10 +48,11 @@ export function useDisplayNames(
 ): UseDisplayNameResponse[] {
   const nameEntries = useNames(requests);
   const firstPartyContractNames = useFirstPartyContractNames(requests);
-  const trustSignals = useTrustSignals(requests);
+  const trustSignals = useTrustSignals(
+    requests.map((req) => ({ ...req, chainId: req.variation })),
+  );
   const erc20Tokens = useERC20Tokens(requests);
   const watchedNFTNames = useWatchedNFTNames(requests);
-  const nfts = useNFTs(requests);
   const ens = useDomainResolutions(requests);
   const accountGroupEntries = useAccountGroupNames(requests, nameEntries);
 
@@ -61,7 +62,6 @@ export function useDisplayNames(
     const trustSignal = trustSignals[index];
     const erc20Token = erc20Tokens[index];
     const watchedNftName = watchedNFTNames[index];
-    const nft = nfts[index];
     const ensName = ens[index];
     const { accountGroupName, walletName } = accountGroupEntries[index];
     const subtitle = walletName;
@@ -76,7 +76,6 @@ export function useDisplayNames(
       firstPartyContractName ||
       // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31880
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-      nft?.name ||
       // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31880
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
       erc20Token?.name ||
@@ -90,7 +89,7 @@ export function useDisplayNames(
 
     // TODO: Fix in https://github.com/MetaMask/metamask-extension/issues/31880
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const image = nft?.image || erc20Token?.image;
+    const image = erc20Token?.image;
 
     const trustSignalIcon = getTrustSignalIcon(displayState);
     const trustSignalLabel = trustSignal?.label;
@@ -101,12 +100,13 @@ export function useDisplayNames(
     }
 
     return {
-      name,
-      hasPetname,
       contractDisplayName: erc20Token?.name,
-      image,
-      icon: trustSignalIcon,
       displayState,
+      hasPetname,
+      icon: trustSignalIcon,
+      image,
+      isAccount: accountGroupName !== null,
+      name,
       subtitle,
     };
   });
@@ -161,42 +161,6 @@ function useWatchedNFTNames(
 
     return watchedNftNamesByAddress?.[contractAddress]?.name;
   });
-}
-
-function useNFTs(
-  nameRequests: UseDisplayNameRequest[],
-): ({ name?: string; image?: string } | undefined)[] {
-  const requests = nameRequests
-    .filter(({ type }) => type === NameType.ETHEREUM_ADDRESS)
-    .map(({ value, variation }) => ({
-      chainId: variation,
-      contractAddress: value,
-    }));
-
-  const nftCollectionsByAddressByChain = useNftCollectionsMetadata(requests);
-
-  return nameRequests.map(
-    ({ type, value: contractAddress, variation: chainId }) => {
-      if (type !== NameType.ETHEREUM_ADDRESS) {
-        return undefined;
-      }
-
-      const nftCollectionProperties =
-        nftCollectionsByAddressByChain[chainId]?.[
-          contractAddress.toLowerCase()
-        ];
-
-      const isSpam = nftCollectionProperties?.isSpam !== false;
-
-      if (!nftCollectionProperties || isSpam) {
-        return undefined;
-      }
-
-      const { name, image } = nftCollectionProperties;
-
-      return { name, image };
-    },
-  );
 }
 
 function useDomainResolutions(nameRequests: UseDisplayNameRequest[]) {
