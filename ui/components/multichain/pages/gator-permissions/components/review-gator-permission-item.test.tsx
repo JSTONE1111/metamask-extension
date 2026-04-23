@@ -1,11 +1,11 @@
 import React from 'react';
 import { Hex } from '@metamask/utils';
 import {
-  StoredGatorPermissionSanitized,
   NativeTokenStreamPermission,
   Erc20TokenStreamPermission,
   NativeTokenPeriodicPermission,
   Erc20TokenPeriodicPermission,
+  PermissionInfoWithMetadata,
 } from '@metamask/gator-permissions-controller';
 import { fireEvent } from '@testing-library/react';
 import { Settings } from 'luxon';
@@ -40,6 +40,10 @@ const store = configureStore({
           type: 'eip155:eoa',
         },
       },
+    },
+    accountIdByAddress: {
+      ...mockState.metamask.accountIdByAddress,
+      [mockAccountAddress]: 'test-account-id',
     },
   },
 });
@@ -111,8 +115,9 @@ describe('Permission List Item', () => {
     describe('NATIVE token permissions', () => {
       const mockExpiryTimestamp = 1767225600; // January 1, 2026 00:00:00 UTC
 
-      const mockNativeTokenStreamPermission: StoredGatorPermissionSanitized<NativeTokenStreamPermission> =
+      const mockNativeTokenStreamPermission: PermissionInfoWithMetadata<NativeTokenStreamPermission> =
         {
+          status: 'Active',
           permissionResponse: {
             chainId: '0x1',
             from: mockAccountAddress,
@@ -140,8 +145,9 @@ describe('Permission List Item', () => {
           siteOrigin: 'http://localhost:8000',
         };
 
-      const mockNativeTokenPeriodicPermission: StoredGatorPermissionSanitized<NativeTokenPeriodicPermission> =
+      const mockNativeTokenPeriodicPermission: PermissionInfoWithMetadata<NativeTokenPeriodicPermission> =
         {
+          status: 'Active',
           permissionResponse: {
             chainId: '0x1',
             from: mockAccountAddress,
@@ -365,8 +371,9 @@ describe('Permission List Item', () => {
         '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599';
       const mockExpiryTimestampErc20 = 1767225600; // January 1, 2026 00:00:00 UTC
 
-      const mockErc20TokenPeriodicPermission: StoredGatorPermissionSanitized<Erc20TokenPeriodicPermission> =
+      const mockErc20TokenPeriodicPermission: PermissionInfoWithMetadata<Erc20TokenPeriodicPermission> =
         {
+          status: 'Active',
           permissionResponse: {
             chainId: '0x5',
             from: mockAccountAddress,
@@ -394,8 +401,9 @@ describe('Permission List Item', () => {
           siteOrigin: 'http://localhost:8000',
         };
 
-      const mockErc20TokenStreamPermission: StoredGatorPermissionSanitized<Erc20TokenStreamPermission> =
+      const mockErc20TokenStreamPermission: PermissionInfoWithMetadata<Erc20TokenStreamPermission> =
         {
+          status: 'Active',
           permissionResponse: {
             chainId: '0x5',
             from: mockAccountAddress,
@@ -542,7 +550,7 @@ describe('Permission List Item', () => {
         const unknownTokenAddress: Hex =
           '0x0000000000000000000000000000000000000001';
 
-        const mockUnknownTokenStreamPermission: StoredGatorPermissionSanitized<Erc20TokenStreamPermission> =
+        const mockUnknownTokenStreamPermission: PermissionInfoWithMetadata<Erc20TokenStreamPermission> =
           {
             permissionResponse: {
               chainId: '0x5',
@@ -563,6 +571,7 @@ describe('Permission List Item', () => {
               delegationManager: '0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3',
             },
             siteOrigin: 'http://localhost:8000',
+            status: 'Active',
           };
 
         const { container, getByTestId } = renderWithProvider(
@@ -612,7 +621,7 @@ describe('Permission List Item', () => {
       });
 
       it('renders erc20 token revocation permission correctly without frequency row', () => {
-        const mockErc20TokenRevocationPermission: StoredGatorPermissionSanitized<{
+        const mockErc20TokenRevocationPermission: PermissionInfoWithMetadata<{
           type: 'erc20-token-revocation';
           isAdjustmentAllowed: boolean;
           data: Record<string, unknown>;
@@ -637,6 +646,7 @@ describe('Permission List Item', () => {
             delegationManager: '0xdb9B1e94B5b69Df7e401DDbedE43491141047dB3',
           },
           siteOrigin: 'http://localhost:8000',
+          status: 'Active',
         };
 
         const { container, getByTestId, queryByTestId } = renderWithProvider(
@@ -679,7 +689,7 @@ describe('Permission List Item', () => {
       });
 
       it('renders "No expiration" when permission has no expiry', () => {
-        const mockPermissionWithoutExpiry: StoredGatorPermissionSanitized<NativeTokenPeriodicPermission> =
+        const mockPermissionWithoutExpiry: PermissionInfoWithMetadata<NativeTokenPeriodicPermission> =
           {
             permissionResponse: {
               chainId: '0x1',
@@ -699,6 +709,7 @@ describe('Permission List Item', () => {
               // No rules array = no expiry
             },
             siteOrigin: 'http://localhost:8000',
+            status: 'Active',
           };
 
         const { container, getByTestId } = renderWithProvider(
@@ -727,7 +738,7 @@ describe('Permission List Item', () => {
       it('renders correct expiration date when permission has expiry', () => {
         const customExpiryTimestamp = 1744588800; // April 14, 2025
 
-        const mockPermissionWithExpiry: StoredGatorPermissionSanitized<NativeTokenPeriodicPermission> =
+        const mockPermissionWithExpiry: PermissionInfoWithMetadata<NativeTokenPeriodicPermission> =
           {
             permissionResponse: {
               chainId: '0x1',
@@ -754,6 +765,7 @@ describe('Permission List Item', () => {
               ],
             },
             siteOrigin: 'http://localhost:8000',
+            status: 'Active',
           };
 
         const { container, getByTestId } = renderWithProvider(
@@ -780,7 +792,7 @@ describe('Permission List Item', () => {
       });
 
       it('renders "No expiration" when rules exist but no expiry rule is present', () => {
-        const mockPermissionWithNonExpiryRules: StoredGatorPermissionSanitized<NativeTokenPeriodicPermission> =
+        const mockPermissionWithNonExpiryRules: PermissionInfoWithMetadata<NativeTokenPeriodicPermission> =
           {
             permissionResponse: {
               chainId: '0x1',
@@ -807,6 +819,7 @@ describe('Permission List Item', () => {
               ],
             },
             siteOrigin: 'http://localhost:8000',
+            status: 'Active',
           };
 
         const { container, getByTestId } = renderWithProvider(

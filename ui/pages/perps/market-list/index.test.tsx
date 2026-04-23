@@ -3,6 +3,10 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProvider } from '../../../../test/lib/render-helpers-navigate';
 import configureStore from '../../../store/store';
 import mockState from '../../../../test/data/mock-state.json';
+import {
+  mockCryptoMarkets,
+  mockHip3Markets,
+} from '../../../components/app/perps/mocks';
 import { MarketListView } from '.';
 
 const mockNavigate = jest.fn();
@@ -10,6 +14,12 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
   useNavigate: () => mockNavigate,
+}));
+
+const mockUsePerpsLiveMarketListData = jest.fn();
+jest.mock('../../../hooks/perps/stream', () => ({
+  usePerpsLiveMarketListData: () => mockUsePerpsLiveMarketListData(),
+  usePerpsLiveAccount: () => ({ account: null }),
 }));
 
 const mockStore = configureStore({
@@ -24,6 +34,15 @@ const mockStore = configureStore({
 describe('MarketListView', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default mock returns loaded state with markets
+    mockUsePerpsLiveMarketListData.mockReturnValue({
+      markets: [...mockCryptoMarkets, ...mockHip3Markets],
+      cryptoMarkets: mockCryptoMarkets,
+      hip3Markets: mockHip3Markets,
+      isInitialLoading: false,
+      error: null,
+      refresh: jest.fn(),
+    });
   });
 
   describe('rendering', () => {
@@ -56,10 +75,47 @@ describe('MarketListView', () => {
 
       expect(screen.getByTestId('back-button')).toBeInTheDocument();
     });
+
+    it('renders live price and change values from the list hook', async () => {
+      const [firstMarket] = mockCryptoMarkets;
+      mockUsePerpsLiveMarketListData.mockReturnValue({
+        markets: [
+          {
+            ...firstMarket,
+            price: '$99,999',
+            change24hPercent: '+9.9%',
+          },
+          ...mockCryptoMarkets.slice(1),
+          ...mockHip3Markets,
+        ],
+        cryptoMarkets: mockCryptoMarkets,
+        hip3Markets: mockHip3Markets,
+        isInitialLoading: false,
+        error: null,
+        refresh: jest.fn(),
+      });
+
+      renderWithProvider(<MarketListView />, mockStore);
+
+      await waitFor(() => {
+        expect(screen.getByText('$99,999')).toBeInTheDocument();
+        expect(screen.getByText('+9.9%')).toBeInTheDocument();
+      });
+    });
   });
 
   describe('loading state', () => {
     it('shows loading skeletons initially', () => {
+      // Override mock to return loading state
+      mockUsePerpsLiveMarketListData.mockReturnValue({
+        markets: [],
+        cryptoMarkets: [],
+        hip3Markets: [],
+        isInitialLoading: true,
+        error: null,
+        refresh: jest.fn(),
+      });
+
       renderWithProvider(<MarketListView />, mockStore);
 
       // Should have multiple skeleton elements
@@ -188,7 +244,7 @@ describe('MarketListView', () => {
       fireEvent.click(sortButton);
 
       await waitFor(() => {
-        expect(screen.getByTestId('sort-dropdown-menu')).toBeInTheDocument();
+        expect(screen.getByTestId('sort-field-modal')).toBeInTheDocument();
       });
     });
   });

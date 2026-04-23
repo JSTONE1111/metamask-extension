@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
+import { Provider } from 'react-redux';
 import type { Meta, StoryObj } from '@storybook/react';
 import { Button, Text, TextVariant } from '@metamask/design-system-react';
 import { GlobalMenuDrawer } from './global-menu-drawer';
+import { GlobalMenuDrawerWithList } from './global-menu-drawer-with-list';
+import configureStore from '../../../store/store';
+import testData from '../../../../.storybook/test-data';
 
 const meta: Meta<typeof GlobalMenuDrawer> = {
   title: 'Components/Multichain/GlobalMenuDrawer',
@@ -25,7 +29,9 @@ const meta: Meta<typeof GlobalMenuDrawer> = {
 export default meta;
 type Story = StoryObj<typeof GlobalMenuDrawer>;
 
-const DefaultWrapper = (args: React.ComponentProps<typeof GlobalMenuDrawer>) => {
+const DefaultWrapper = (
+  args: React.ComponentProps<typeof GlobalMenuDrawer>,
+) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -42,9 +48,9 @@ const DefaultWrapper = (args: React.ComponentProps<typeof GlobalMenuDrawer>) => 
             Drawer Content
           </Text>
           <Text>
-            This is an example drawer built with Headless UI Dialog. It
-            provides accessibility features like focus management and keyboard
-            navigation out of the box.
+            This is an example drawer built with Headless UI Dialog. It provides
+            accessibility features like focus management and keyboard navigation
+            out of the box.
           </Text>
         </div>
       </GlobalMenuDrawer>
@@ -69,7 +75,9 @@ const WithoutCloseButtonWrapper = () => {
         title="Drawer without close button"
       >
         <div className="p-4">
-          <Text>This drawer doesn&apos;t have a close button in the header.</Text>
+          <Text>
+            This drawer doesn&apos;t have a close button in the header.
+          </Text>
           <Button onClick={() => setIsOpen(false)} className="mt-4">
             Close Drawer
           </Button>
@@ -105,4 +113,24 @@ const CustomWidthWrapper = () => {
 
 export const CustomWidth: Story = {
   render: CustomWidthWrapper,
+};
+
+const store = configureStore(testData);
+
+const WithGlobalMenuListWrapper = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Provider store={store}>
+      <Button onClick={() => setIsOpen(true)}>Open Menu Drawer</Button>
+      <GlobalMenuDrawerWithList
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+      />
+    </Provider>
+  );
+};
+
+export const WithGlobalMenuList: Story = {
+  render: WithGlobalMenuListWrapper,
 };

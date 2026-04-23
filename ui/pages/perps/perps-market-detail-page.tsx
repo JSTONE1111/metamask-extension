@@ -1,8 +1,18 @@
-import React, { useMemo, useCallback, useState, useRef } from 'react';
-import { useSelector } from 'react-redux';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import React, {
+  useMemo,
+  useCallback,
+  useState,
+  useRef,
+  useEffect,
+} from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import {
-  twMerge,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
+import {
   Box,
   BoxFlexDirection,
   BoxAlignItems,
@@ -20,46 +30,226 @@ import {
   ButtonVariant,
   ButtonSize,
 } from '@metamask/design-system-react';
-import { getIsPerpsEnabled } from '../../selectors/perps/feature-flags';
-import { useI18nContext } from '../../hooks/useI18nContext';
-import { DEFAULT_ROUTE } from '../../helpers/constants/routes';
+import { brandColor } from '@metamask/design-tokens';
+import type { PriceUpdate } from '@metamask/perps-controller';
 import {
-  mockPositions,
-  mockOrders,
-  mockAccountState,
-} from '../../components/app/perps/mocks';
+  formatFundingRate,
+  formatPerpsFiat,
+  formatPnl,
+  formatPositionSize,
+  PRICE_RANGES_MINIMAL_VIEW,
+} from '../../../shared/lib/perps-formatters';
+import {
+  PERPS_EVENT_PROPERTY,
+  PERPS_EVENT_VALUE,
+} from '../../../shared/constants/perps-events';
+import { getIsPerpsExperienceAvailable } from '../../selectors/perps/feature-flags';
+import { getSelectedInternalAccount } from '../../selectors/accounts';
+import { useI18nContext } from '../../hooks/useI18nContext';
+import { useTheme } from '../../hooks/useTheme';
+import {
+  DEFAULT_ROUTE,
+  PERPS_ORDER_ENTRY_ROUTE,
+} from '../../helpers/constants/routes';
+import {
+  usePerpsLivePositions,
+  usePerpsLiveOrders,
+  usePerpsLiveAccount,
+  usePerpsLiveMarketData,
+  usePerpsLiveCandles,
+} from '../../hooks/perps/stream';
+import {
+  usePerpsEligibility,
+  usePerpsEventTracking,
+  usePerpsMarketInfo,
+} from '../../hooks/perps';
+import { getPerpsStreamManager } from '../../providers/perps';
+import { submitRequestToBackground } from '../../store/background-connection';
+import { usePerpsMeasurement } from '../../hooks/perps/usePerpsMeasurement';
 import { OrderCard } from '../../components/app/perps/order-card';
+import { PerpsMarketRecentActivity } from '../../components/app/perps/perps-market-recent-activity';
 import { PerpsTokenLogo } from '../../components/app/perps/perps-token-logo';
 import {
   PerpsCandlestickChart,
   PerpsCandlestickChartRef,
 } from '../../components/app/perps/perps-candlestick-chart';
+import type { ChartPriceLine } from '../../components/app/perps/perps-candlestick-chart';
 import { PerpsCandlePeriodSelector } from '../../components/app/perps/perps-candle-period-selector';
 import {
   CandlePeriod,
+  TimeDuration,
   ZOOM_CONFIG,
 } from '../../components/app/perps/constants/chartConfig';
 import {
   getDisplayName,
-  findMarketBySymbol,
   safeDecodeURIComponent,
   getChangeColor,
+  formatSignedChangePercent,
 } from '../../components/app/perps/utils';
-import { useFormatters } from '../../hooks/useFormatters';
 import {
-  OrderEntry,
-  type OrderDirection,
-  type OrderFormState,
-  type OrderMode,
-} from '../../components/app/perps/order-entry';
-import type { OrderType } from '../../components/app/perps/types';
+  parsePerpsDisplayPrice,
+  formatPerpsFiatMinimal,
+  formatPerpsFiatUniversal,
+} from '../../components/app/perps/utils/formatPerpsDisplayPrice';
+import { normalizeMarketDetailsOrders } from '../../components/app/perps/utils/orderUtils';
+import { PerpsDetailPageSkeleton } from '../../components/app/perps/perps-skeletons';
+import { Skeleton } from '../../components/component-library/skeleton';
+import { Popover, PopoverPosition } from '../../components/component-library';
+import { useFormatters } from '../../hooks/useFormatters';
+import { EditMarginModal } from '../../components/app/perps/edit-margin';
+import { ReversePositionModal } from '../../components/app/perps/reverse-position';
+import { UpdateTPSLModal } from '../../components/app/perps/update-tpsl';
+import { ClosePositionModal } from '../../components/app/perps/close-position';
+import { CancelOrderModal } from '../../components/app/perps/cancel-order';
+import { PerpsGeoBlockModal } from '../../components/app/perps/perps-geo-block-modal';
+import type { Order } from '../../components/app/perps/types';
+import {
+  PERPS_TOAST_KEYS,
+  type PerpsToastKey,
+  usePerpsToast,
+} from '../../components/app/perps/perps-toast';
+import Tooltip from '../../components/ui/tooltip';
+import { BorderRadius } from '../../helpers/constants/design-system';
+import type { MetaMaskReduxState } from '../../store/store';
+import { MetaMetricsEventName } from '../../../shared/constants/metametrics';
+import {
+  type PerpsState,
+  selectPerpsIsWatchlistMarket,
+} from '../../selectors/perps-controller';
+import { setTutorialModalOpen } from '../../ducks/perps';
+import { PerpsTutorialModal } from '../../components/app/perps/perps-tutorial-modal';
 
 /**
- * View state for the market detail page
- * - 'detail': Shows market info, position, stats
- * - 'order': Shows the order entry form
+ * Calculate the funding countdown string (time until next UTC hour).
+ * Funding on HyperLiquid is paid every hour on the hour (UTC).
+ *
+ * @returns Formatted countdown string, e.g. "00:23:45"
  */
-type MarketDetailView = 'detail' | 'order';
+function calculateFundingCountdown(): string {
+  const now = new Date();
+  let minutesRemaining = 59 - now.getUTCMinutes();
+  let secondsRemaining = 60 - now.getUTCSeconds();
+
+  // Handle rollover: if seconds hit 60, carry to minutes
+  if (secondsRemaining === 60) {
+    secondsRemaining = 0;
+    minutesRemaining += 1;
+  }
+
+  // Handle rollover: if minutes hit 60, display as 01:00:00
+  if (minutesRemaining === 60) {
+    return '01:00:00';
+  }
+
+  const hh = '00';
+  const mm = String(minutesRemaining).padStart(2, '0');
+  const ss = String(secondsRemaining).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+/**
+ * Hook that returns a live funding countdown string, updated every second.
+ *
+ * @returns Formatted countdown string, e.g. "00:23:45"
+ */
+function useFundingCountdown(): string {
+  const [countdown, setCountdown] = useState(calculateFundingCountdown);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown(calculateFundingCountdown());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return countdown;
+}
+
+type PopoverMenuItemProps = {
+  icon: IconName;
+  label: string;
+  description: string;
+  onClick: () => void;
+  className?: string;
+  'data-testid'?: string;
+};
+
+const PopoverMenuItem: React.FC<PopoverMenuItemProps> = ({
+  icon,
+  label,
+  description,
+  onClick,
+  className = '',
+  'data-testid': testId,
+}) => (
+  <Box
+    className={`w-full text-left px-4 py-4 bg-transparent hover:bg-hover active:bg-pressed flex items-start gap-3 cursor-pointer ${className}`}
+    onClick={onClick}
+    data-testid={testId}
+  >
+    <Icon
+      name={icon}
+      size={IconSize.Sm}
+      color={IconColor.IconDefault}
+      className="shrink-0 mt-0.5"
+    />
+    <Box
+      flexDirection={BoxFlexDirection.Column}
+      gap={0}
+      className="min-w-0 flex-1"
+    >
+      <Text variant={TextVariant.BodySm} fontWeight={FontWeight.Medium}>
+        {label}
+      </Text>
+      <Text variant={TextVariant.BodyXs} color={TextColor.TextAlternative}>
+        {description}
+      </Text>
+    </Box>
+  </Box>
+);
+
+const PERPS_TOAST_KEY_SET: Set<string> = new Set(
+  Object.values(PERPS_TOAST_KEYS),
+);
+
+const isPerpsToastKey = (value: unknown): value is PerpsToastKey => {
+  return typeof value === 'string' && PERPS_TOAST_KEY_SET.has(value);
+};
+
+type ParsedPerpsToastRouteState = {
+  perpsToastDescription?: string;
+  perpsToastKey: PerpsToastKey;
+  remainingState?: Record<string, unknown>;
+};
+
+const parsePerpsToastRouteState = (
+  state: unknown,
+): ParsedPerpsToastRouteState | null => {
+  if (!state || typeof state !== 'object') {
+    return null;
+  }
+
+  const routeState = state as Record<string, unknown>;
+  if (!isPerpsToastKey(routeState.perpsToastKey)) {
+    return null;
+  }
+
+  const { perpsToastKey, perpsToastDescription, ...remainingState } =
+    routeState;
+
+  const routeToastDescription =
+    typeof perpsToastDescription === 'string' && perpsToastDescription
+      ? perpsToastDescription
+      : undefined;
+
+  return {
+    perpsToastKey,
+    ...(routeToastDescription
+      ? { perpsToastDescription: routeToastDescription }
+      : {}),
+    ...(Object.keys(remainingState).length > 0 ? { remainingState } : {}),
+  };
+};
 
 /**
  * PerpsMarketDetailPage component
@@ -68,11 +258,104 @@ type MarketDetailView = 'detail' | 'order';
  */
 const PerpsMarketDetailPage: React.FC = () => {
   const t = useI18nContext();
+  const theme = useTheme();
+  const isDark = theme === 'dark';
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { symbol } = useParams<{ symbol: string }>();
-  const isPerpsEnabled = useSelector(getIsPerpsEnabled);
-  const { formatCurrencyWithMinThreshold, formatTokenQuantity, formatNumber } =
-    useFormatters();
+  const isPerpsExperienceAvailable = useSelector(getIsPerpsExperienceAvailable);
+  const selectedAccount = useSelector(getSelectedInternalAccount);
+  const selectedAddress = selectedAccount?.address;
+  const { isEligible } = usePerpsEligibility();
+  const { track } = usePerpsEventTracking();
+  const {
+    formatCurrencyWithMinThreshold,
+    formatNumber,
+    formatPercentWithMinThreshold,
+  } = useFormatters();
+  const fundingCountdown = useFundingCountdown();
+  const { replacePerpsToastByKey, pendingOrder, setPendingOrder } =
+    usePerpsToast();
+  const [isGeoBlockModalOpen, setIsGeoBlockModalOpen] = useState(false);
+
+  useEffect(() => {
+    const parsedRouteState = parsePerpsToastRouteState(location.state);
+    if (!parsedRouteState) {
+      return;
+    }
+
+    replacePerpsToastByKey({
+      key: parsedRouteState.perpsToastKey,
+      ...(parsedRouteState.perpsToastDescription
+        ? { description: parsedRouteState.perpsToastDescription }
+        : {}),
+    });
+
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: parsedRouteState.remainingState ?? undefined,
+    });
+  }, [
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    replacePerpsToastByKey,
+  ]);
+
+  // Use stream hooks for real-time data
+  const { positions: allPositions } = usePerpsLivePositions();
+  const orderFilledToastShownRef = useRef(false);
+
+  useEffect(() => {
+    if (orderFilledToastShownRef.current) {
+      return;
+    }
+
+    // Primary: read from shared toast context (set by order entry via navigate(-1) flow).
+    // Fallback: read from location.state for any remaining route-state-based navigation.
+    const routeState = location.state as Record<string, unknown> | null;
+    const pendingSymbol =
+      pendingOrder?.symbol ??
+      (typeof routeState?.pendingOrderSymbol === 'string'
+        ? routeState.pendingOrderSymbol
+        : null);
+
+    if (!pendingSymbol) {
+      return;
+    }
+
+    const hasPosition = allPositions.some((p) => p.symbol === pendingSymbol);
+    if (hasPosition) {
+      orderFilledToastShownRef.current = true;
+
+      const filledDescription =
+        pendingOrder?.filledDescription ??
+        (typeof routeState?.pendingOrderFilledDescription === 'string'
+          ? routeState.pendingOrderFilledDescription
+          : undefined);
+
+      replacePerpsToastByKey({
+        key: PERPS_TOAST_KEYS.ORDER_FILLED,
+        ...(filledDescription ? { description: filledDescription } : {}),
+      });
+
+      setPendingOrder(null);
+    }
+  }, [
+    location.state,
+    allPositions,
+    replacePerpsToastByKey,
+    pendingOrder,
+    setPendingOrder,
+  ]);
+
+  const { orders: allOrders } = usePerpsLiveOrders();
+  const { account, isInitialLoading: isLoadingAccount } = usePerpsLiveAccount();
+  const { markets: allMarkets, isInitialLoading: marketsLoading } =
+    usePerpsLiveMarketData();
+
   // Safely decode the symbol from URL
   const decodedSymbol = useMemo(() => {
     if (!symbol) {
@@ -81,35 +364,124 @@ const PerpsMarketDetailPage: React.FC = () => {
     return safeDecodeURIComponent(symbol);
   }, [symbol]);
 
+  const hasPerpBalance = Boolean(
+    account && Number.parseFloat(account.availableBalance) > 0,
+  );
+  usePerpsEventTracking({
+    eventName: MetaMetricsEventName.PerpsScreenViewed,
+    conditions: !marketsLoading && Boolean(decodedSymbol) && account !== null,
+    properties: {
+      [PERPS_EVENT_PROPERTY.SCREEN_TYPE]:
+        PERPS_EVENT_VALUE.SCREEN_TYPE.ASSET_DETAILS,
+      ...(decodedSymbol && {
+        [PERPS_EVENT_PROPERTY.ASSET]: decodedSymbol,
+      }),
+      [PERPS_EVENT_PROPERTY.SOURCE]: PERPS_EVENT_VALUE.SOURCE.MARKET_LIST,
+      [PERPS_EVENT_PROPERTY.HAS_PERP_BALANCE]: hasPerpBalance ? 'yes' : 'no',
+    },
+    resetKey: decodedSymbol,
+  });
+
+  const [showSizeInFiat, setShowSizeInFiat] = useState(false);
+
+  // Subscribe to live price data for current symbol (provides oracle price, live funding, OI)
+  // Uses background streaming via perpsActivatePriceStream + PerpsStreamManager
+  const [livePrice, setLivePrice] = useState<PriceUpdate | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    if (!decodedSymbol || !selectedAddress) {
+      setLivePrice(undefined);
+      return undefined;
+    }
+
+    // Activate background price stream for this symbol
+    submitRequestToBackground('perpsActivatePriceStream', [
+      { symbols: [decodedSymbol], includeMarketData: true },
+    ]).catch(() => {
+      // Controller not ready yet, skip silently
+    });
+
+    // Subscribe to price updates from the stream manager
+    const streamManager = getPerpsStreamManager();
+    const unsubscribe = streamManager.prices.subscribe((priceUpdates) => {
+      const update = priceUpdates.find((p) => p.symbol === decodedSymbol);
+      if (update) {
+        const ts = (update as { timestamp?: number }).timestamp;
+        const mark = (update as { markPrice?: string }).markPrice;
+        setLivePrice({
+          symbol: update.symbol,
+          price: update.price,
+          timestamp: ts ?? Date.now(),
+          percentChange24h: update.percentChange24h,
+          markPrice: mark,
+        });
+      }
+    });
+
+    return () => {
+      submitRequestToBackground('perpsDeactivatePriceStream', []);
+      unsubscribe();
+    };
+  }, [decodedSymbol, selectedAddress]);
+
   // Find market data for the given symbol
   const market = useMemo(() => {
     if (!decodedSymbol) {
       return undefined;
     }
-    return findMarketBySymbol(decodedSymbol);
-  }, [decodedSymbol]);
+    return allMarkets.find(
+      (m) => m.symbol.toLowerCase() === decodedSymbol.toLowerCase(),
+    );
+  }, [decodedSymbol, allMarkets]);
+
+  const marketInfo = usePerpsMarketInfo(decodedSymbol ?? '');
 
   // Find position for this market (if exists)
   const position = useMemo(() => {
     if (!decodedSymbol) {
       return undefined;
     }
-    return mockPositions.find(
-      (pos) => pos.coin.toLowerCase() === decodedSymbol.toLowerCase(),
+    return allPositions.find(
+      (pos) => pos.symbol.toLowerCase() === decodedSymbol.toLowerCase(),
     );
-  }, [decodedSymbol]);
+  }, [decodedSymbol, allPositions]);
 
-  // Find orders for this market
+  // Ref to track current position - avoids stale data in callbacks
+  // This follows mobile's pattern (currentPositionRef) to ensure we always
+  // have the latest position data when callbacks execute after navigation/delays
+  //
+  // TODO: Future improvement - pass the live position from WebSocket to
+  // updatePositionTPSL to avoid REST fallback. See mobile's architecture:
+  // - If params.position is provided, use it (WebSocket-derived)
+  // - Otherwise, controller falls back to REST fetch
+  // This optimization should be implemented in @metamask/perps-controller
+  // and applied to multiple operations (TPSL, closePosition, etc.)
+  const positionRef = useRef(position);
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  // Filter and sort open orders for this market, then normalize for display.
+  // Normalization adds synthetic TP/SL rows for parent orders when no matching
+  // real trigger exists; full-position TP/SL also appear in this Orders list.
   const orders = useMemo(() => {
     if (!decodedSymbol) {
       return [];
     }
-    return mockOrders.filter(
-      (order) =>
-        order.symbol.toLowerCase() === decodedSymbol.toLowerCase() &&
-        order.status === 'open',
-    );
-  }, [decodedSymbol]);
+    const marketOrders = allOrders
+      .filter(
+        (order) =>
+          order.symbol.toLowerCase() === decodedSymbol.toLowerCase() &&
+          order.status === 'open',
+      )
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    return normalizeMarketDetailsOrders({
+      orders: marketOrders,
+      existingPosition: position,
+    });
+  }, [decodedSymbol, allOrders, position]);
 
   // Candle period state and chart ref
   const [selectedPeriod, setSelectedPeriod] = useState<CandlePeriod>(
@@ -117,35 +489,164 @@ const PerpsMarketDetailPage: React.FC = () => {
   );
   const chartRef = useRef<PerpsCandlestickChartRef>(null);
 
-  // View state: 'detail' or 'order'
-  const [currentView, setCurrentView] = useState<MarketDetailView>('detail');
-  const [orderDirection, setOrderDirection] = useState<OrderDirection>('long');
-  const [orderType, setOrderType] = useState<OrderType>('market');
-  const [isOrderTypeDropdownOpen, setIsOrderTypeDropdownOpen] = useState(false);
-  const [orderFormState, setOrderFormState] = useState<OrderFormState | null>(
+  // Live candle data from CandleStreamChannel
+  const {
+    candleData,
+    isInitialLoading: isCandleLoading,
+    error: candleError,
+    fetchMoreHistory,
+  } = usePerpsLiveCandles({
+    symbol: decodedSymbol ?? '',
+    interval: selectedPeriod,
+    duration: TimeDuration.YearToDate,
+    throttleMs: 1000,
+  });
+
+  usePerpsMeasurement(
+    'PerpsMarketDetailLoaded',
+    !marketsLoading && !isCandleLoading,
+  );
+
+  // OHLCV bar state: the candle currently hovered by crosshair (null = no hover)
+  // const [hoveredCandle, setHoveredCandle] = useState<CandleStick | null>(null);
+
+  const [isModifyMenuOpen, setIsModifyMenuOpen] = useState(false);
+  const [isMarginMenuOpen, setIsMarginMenuOpen] = useState(false);
+  const [marginModalMode, setMarginModalMode] = useState<
+    'add' | 'remove' | null
+  >(null);
+  const [isReverseModalOpen, setIsReverseModalOpen] = useState(false);
+  const [isTPSLModalOpen, setIsTPSLModalOpen] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(
     null,
   );
-  // Order mode: 'new' for opening, 'modify' for adjusting, 'close' for closing
-  const [orderMode, setOrderMode] = useState<OrderMode>('new');
+  const modifyMenuRef = useRef<HTMLDivElement>(null);
+  const marginMenuRef = useRef<HTMLDivElement>(null);
+  const isInWatchlist = useSelector((state: MetaMaskReduxState) =>
+    selectPerpsIsWatchlistMarket(state as PerpsState, decodedSymbol ?? ''),
+  );
 
-  // Get available balance from mock account state
-  const availableBalance = parseFloat(mockAccountState.availableBalance);
-
-  // Parse current price from market data (remove $ and commas)
-  const currentPrice = useMemo(() => {
+  // Parse fallback price from market data (used before candle stream is ready)
+  const marketPrice = useMemo(() => {
     if (!market) {
       return 0;
     }
     return parseFloat(market.price.replace(/[$,]/gu, ''));
   }, [market]);
 
-  // Parse max leverage from market data (remove 'x')
-  const maxLeverage = useMemo(() => {
-    if (!market) {
-      return 50;
+  // Current price derived from the last candle's close price.
+  // Updates on every live tick (~1000ms), keeping the price line in sync with the chart.
+  // This is the single source of truth for price display on the detail page.
+  const chartCurrentPrice = useMemo(() => {
+    if (!candleData?.candles?.length) {
+      return 0;
     }
-    return parseInt(market.maxLeverage.replace('x', ''), 10);
-  }, [market]);
+    const lastCandle = candleData.candles.at(-1);
+    return lastCandle?.close ? parseFloat(lastCandle.close) : 0;
+  }, [candleData]);
+
+  // Current price for calculations (orders, margin, slippage).
+  // Prefers the live candle price, falls back to market data during initial load.
+  const currentPrice = chartCurrentPrice > 0 ? chartCurrentPrice : marketPrice;
+
+  // Formatted display price for the header — synced with the chart price line.
+  // Falls back to market.price string during initial candle load.
+  const displayPrice = useMemo(() => {
+    if (chartCurrentPrice > 0) {
+      return formatPerpsFiatUniversal(chartCurrentPrice);
+    }
+    const streamPrice = Number.parseFloat(livePrice?.price ?? '');
+    if (Number.isFinite(streamPrice) && streamPrice > 0) {
+      return formatPerpsFiatUniversal(streamPrice);
+    }
+    if (market?.price) {
+      return formatPerpsFiatUniversal(market.price);
+    }
+    return '$0.00';
+  }, [market?.price, livePrice?.price, chartCurrentPrice]);
+
+  // 24h change prefers live stream updates when available, with market-data fallback.
+  const displayChange = formatSignedChangePercent(
+    livePrice?.percentChange24h ?? market?.change24hPercent ?? '',
+  );
+
+  // Build price lines for chart overlay (current price + TP, Entry, SL)
+  // Current price line is always shown; TP/Entry/SL only when position exists.
+  const chartPriceLines = useMemo((): ChartPriceLine[] => {
+    const lines: ChartPriceLine[] = [];
+
+    // Current price line — always shown, derived from last candle close
+    if (chartCurrentPrice > 0) {
+      lines.push({
+        price: chartCurrentPrice,
+        label: '',
+        // Matches mobile `background.muted`: dark=#ffffff0a (~4%), light=#b4b4b528 (~16%)
+        color: isDark ? '#ffffff0a' : '#b4b4b528',
+        lineStyle: 2,
+        lineWidth: 2,
+      });
+    }
+
+    // Position-specific lines (only when user has an open position)
+    if (position) {
+      // Take Profit line — matches mobile `success.default`
+      if (position.takeProfitPrice) {
+        const tpPrice = parsePerpsDisplayPrice(position.takeProfitPrice);
+        if (!isNaN(tpPrice) && tpPrice > 0) {
+          lines.push({
+            price: tpPrice,
+            label: 'TP',
+            color: isDark ? brandColor.lime100 : brandColor.lime500,
+            lineStyle: 2,
+          });
+        }
+      }
+
+      // Entry price line — matches mobile `text.muted`
+      if (position.entryPrice) {
+        const entryPrice = parsePerpsDisplayPrice(position.entryPrice);
+        if (!isNaN(entryPrice) && entryPrice > 0) {
+          lines.push({
+            price: entryPrice,
+            label: 'Entry',
+            color: isDark ? brandColor.grey600 : brandColor.grey200,
+            lineStyle: 2,
+          });
+        }
+      }
+
+      // Stop Loss line — matches mobile `background.alternative`
+      // Intentionally subtle: SL is a reference marker, not a danger indicator like Liq.
+      if (position.stopLossPrice) {
+        const slPrice = parsePerpsDisplayPrice(position.stopLossPrice);
+        if (!isNaN(slPrice) && slPrice > 0) {
+          lines.push({
+            price: slPrice,
+            label: 'SL',
+            color: isDark ? brandColor.grey1000 : brandColor.grey050,
+            lineStyle: 2,
+          });
+        }
+      }
+
+      // Liquidation price line — matches mobile `error.default`
+      // Same as down candles so traders immediately recognise the danger level.
+      if (position.liquidationPrice) {
+        const liqPrice = parsePerpsDisplayPrice(position.liquidationPrice);
+        if (!isNaN(liqPrice) && liqPrice > 0) {
+          lines.push({
+            price: liqPrice,
+            label: 'Liq',
+            color: isDark ? brandColor.red300 : brandColor.red500,
+            lineStyle: 2,
+          });
+        }
+      }
+    }
+
+    return lines;
+  }, [position, chartCurrentPrice, isDark]);
 
   // Handle candle period change
   //
@@ -195,69 +696,202 @@ const PerpsMarketDetailPage: React.FC = () => {
     }
   }, []);
 
-  // Navigation handlers - use history back to return to wherever user came from
-  // (perps home page or perps tab)
   const handleBackClick = useCallback(() => {
-    // If in order view, go back to detail view and reset mode
-    if (currentView === 'order') {
-      setCurrentView('detail');
-      setOrderMode('new'); // Reset mode when leaving order view
-      return;
-    }
     navigate(-1);
-  }, [navigate, currentView]);
+  }, [navigate]);
 
-  // Handle opening order entry with a specific direction (new order)
-  const handleOpenOrder = useCallback((direction: OrderDirection) => {
-    setOrderDirection(direction);
-    setOrderMode('new');
-    setCurrentView('order');
-  }, []);
+  const buildOrderEntryUrl = useCallback(
+    (direction: 'long' | 'short', mode: 'new' | 'modify') => {
+      if (!decodedSymbol) {
+        return '#';
+      }
+      const params = new URLSearchParams({ direction, mode });
+      return `${PERPS_ORDER_ENTRY_ROUTE}/${encodeURIComponent(decodedSymbol)}?${params.toString()}`;
+    },
+    [decodedSymbol],
+  );
 
-  // Handle modifying an existing position
-  const handleModifyPosition = useCallback(() => {
-    if (!position) {
-      return;
-    }
-    const isLong = parseFloat(position.size) >= 0;
-    setOrderDirection(isLong ? 'long' : 'short');
-    setOrderMode('modify');
-    setCurrentView('order');
-  }, [position]);
+  const handleOpenOrder = useCallback(
+    (direction: 'long' | 'short') => {
+      if (!isEligible) {
+        setIsGeoBlockModalOpen(true);
+        return;
+      }
+      if (!decodedSymbol || isLoadingAccount) {
+        return;
+      }
+      track(MetaMetricsEventName.PerpsUiInteraction, {
+        [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+          PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+        [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+          PERPS_EVENT_VALUE.BUTTON_CLICKED.TRADE,
+        [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+          PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+        [PERPS_EVENT_PROPERTY.ASSET]: decodedSymbol,
+        [PERPS_EVENT_PROPERTY.DIRECTION]: direction,
+      });
+      navigate(buildOrderEntryUrl(direction, 'new'));
+    },
+    [
+      isEligible,
+      decodedSymbol,
+      isLoadingAccount,
+      navigate,
+      buildOrderEntryUrl,
+      track,
+    ],
+  );
 
-  // Handle closing an existing position
   const handleClosePosition = useCallback(() => {
+    if (!isEligible) {
+      setIsGeoBlockModalOpen(true);
+      return;
+    }
     if (!position) {
       return;
     }
-    const isLong = parseFloat(position.size) >= 0;
-    setOrderDirection(isLong ? 'long' : 'short');
-    setOrderMode('close');
-    setCurrentView('order');
-  }, [position]);
+    setIsCloseModalOpen(true);
+  }, [isEligible, position]);
 
-  // Handle form state changes from OrderEntry
-  const handleFormStateChange = useCallback((formState: OrderFormState) => {
-    setOrderFormState(formState);
+  const handleOpenAddMarginModal = useCallback(() => {
+    track(MetaMetricsEventName.PerpsUiInteraction, {
+      [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+        PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+      [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+        PERPS_EVENT_VALUE.BUTTON_CLICKED.ADD_MARGIN,
+      [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+        PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+    });
+    setIsModifyMenuOpen(false);
+    setIsMarginMenuOpen(false);
+    setMarginModalMode('add');
+  }, [track]);
+
+  const handleOpenDecreaseMarginModal = useCallback(() => {
+    track(MetaMetricsEventName.PerpsUiInteraction, {
+      [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+        PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+      [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+        PERPS_EVENT_VALUE.BUTTON_CLICKED.REMOVE_MARGIN,
+      [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+        PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+    });
+    setIsModifyMenuOpen(false);
+    setIsMarginMenuOpen(false);
+    setMarginModalMode('remove');
+  }, [track]);
+
+  const handleOpenReverseModal = useCallback(() => {
+    setIsModifyMenuOpen(false);
+    setIsReverseModalOpen(true);
   }, []);
 
-  // Handle order submission
-  const handleOrderSubmit = useCallback(() => {
-    if (!orderFormState) {
+  const handleAddExposure = useCallback(() => {
+    if (!position || !decodedSymbol) {
       return;
     }
-    // TODO: Integrate with PerpsController to submit order
-    // For now, just log the order and return to detail view
-    console.log('Order submitted:', orderFormState);
-    setCurrentView('detail');
-  }, [orderFormState]);
+    track(MetaMetricsEventName.PerpsUiInteraction, {
+      [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+        PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+      [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+        PERPS_EVENT_VALUE.BUTTON_CLICKED.INCREASE_EXPOSURE,
+      [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+        PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+    });
+    setIsModifyMenuOpen(false);
+    if (position.leverage?.type === 'cross') {
+      replacePerpsToastByKey({
+        key: PERPS_TOAST_KEYS.INCREASE_POSITION_CROSS_MARGIN_BLOCKED,
+        description: t('perpsCrossMarginNotSupportedDescription'),
+      });
+      return;
+    }
+    const direction = parseFloat(position.size) >= 0 ? 'long' : 'short';
+    navigate(buildOrderEntryUrl(direction, 'modify'));
+  }, [
+    position,
+    decodedSymbol,
+    navigate,
+    buildOrderEntryUrl,
+    track,
+    replacePerpsToastByKey,
+    t,
+  ]);
 
-  // No-op handler for order cards - orders on detail page are already
-  // filtered to current market, so clicking should not navigate anywhere
-  const handleOrderClick = useCallback(() => undefined, []);
+  const handleReduceExposure = useCallback(() => {
+    if (!isEligible) {
+      setIsGeoBlockModalOpen(true);
+      return;
+    }
+    if (!position || !decodedSymbol) {
+      return;
+    }
+    track(MetaMetricsEventName.PerpsUiInteraction, {
+      [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+        PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+      [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+        PERPS_EVENT_VALUE.BUTTON_CLICKED.REDUCE_EXPOSURE,
+      [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+        PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+    });
+    setIsModifyMenuOpen(false);
+    setIsCloseModalOpen(true);
+  }, [isEligible, position, decodedSymbol, track]);
+
+  const handleOpenMarginMenu = useCallback(() => {
+    track(MetaMetricsEventName.PerpsUiInteraction, {
+      [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+        PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+      [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+        PERPS_EVENT_VALUE.BUTTON_CLICKED.MARGIN,
+      [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+        PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+    });
+    setIsModifyMenuOpen(false);
+    setIsMarginMenuOpen((prev) => !prev);
+  }, [track]);
+
+  const handleCloseMarginModal = useCallback(() => {
+    setMarginModalMode(null);
+  }, []);
+
+  const handleCloseReverseModal = useCallback(() => {
+    setIsReverseModalOpen(false);
+  }, []);
+
+  const handleOpenTPSLModal = useCallback(() => {
+    setIsTPSLModalOpen(true);
+  }, []);
+
+  const handleCloseTPSLModal = useCallback(() => {
+    setIsTPSLModalOpen(false);
+  }, []);
+
+  const handleFavoriteClick = useCallback(() => {
+    if (!decodedSymbol) {
+      return;
+    }
+    track(MetaMetricsEventName.PerpsUiInteraction, {
+      [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+        PERPS_EVENT_VALUE.INTERACTION_TYPE.FAVORITE_TOGGLED,
+      [PERPS_EVENT_PROPERTY.ASSET]: decodedSymbol,
+      [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+        PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+    });
+    submitRequestToBackground('perpsToggleWatchlistMarket', [
+      decodedSymbol,
+    ]).catch((e) => {
+      console.warn('[Perps] Toggle watchlist failed:', e);
+    });
+  }, [decodedSymbol, track]);
+
+  // Opens the cancel order modal for the selected order
+  const handleOrderClick = useCallback((order: Order) => {
+    setCancelOrderTarget(order);
+  }, []);
 
   // Guard: redirect if perps feature is disabled
-  if (!isPerpsEnabled) {
+  if (!isPerpsExperienceAvailable) {
     return <Navigate to={DEFAULT_ROUTE} replace />;
   }
 
@@ -266,7 +900,12 @@ const PerpsMarketDetailPage: React.FC = () => {
     return <Navigate to={DEFAULT_ROUTE} replace />;
   }
 
-  // If market not found, show error state
+  // Show loading state while market data is being fetched
+  if (marketsLoading) {
+    return <PerpsDetailPageSkeleton />;
+  }
+
+  // If market not found after loading, show error state
   if (!market) {
     return (
       <Box className="main-container asset__container">
@@ -310,35 +949,47 @@ const PerpsMarketDetailPage: React.FC = () => {
 
   const displayName = getDisplayName(market.symbol);
 
-  // Determine submit button text based on order mode
-  const isLong = orderDirection === 'long';
-  const getSubmitButtonText = () => {
-    switch (orderMode) {
-      case 'modify':
-        return t('perpsModifyPosition');
-      case 'close':
-        return isLong
-          ? t('perpsConfirmCloseLong')
-          : t('perpsConfirmCloseShort');
-      default:
-        return isLong
-          ? t('perpsOpenLong', [displayName])
-          : t('perpsOpenShort', [displayName]);
+  // Render the chart area: skeleton during initial load, error state on failure,
+  // or the live chart once data is available.
+  const renderChartContent = () => {
+    if (isCandleLoading && !candleData) {
+      return (
+        <Skeleton className="h-[250px] w-full" borderRadius={BorderRadius.LG} />
+      );
     }
-  };
-  const submitButtonText = getSubmitButtonText();
 
-  // Determine header text based on order mode
-  const getHeaderText = () => {
-    const directionText = isLong ? t('perpsLong') : t('perpsShort');
-    switch (orderMode) {
-      case 'modify':
-        return `${t('perpsModify')} ${directionText} ${displayName}`;
-      case 'close':
-        return `${t('perpsClose')} ${directionText} ${displayName}`;
-      default:
-        return `${directionText} ${displayName}`;
+    if (candleError && !candleData) {
+      return (
+        <Box
+          flexDirection={BoxFlexDirection.Column}
+          alignItems={BoxAlignItems.Center}
+          justifyContent={BoxJustifyContent.Center}
+          className="h-[250px] w-full rounded-lg bg-muted"
+          gap={2}
+        >
+          <Icon
+            name={IconName.Warning}
+            size={IconSize.Lg}
+            color={IconColor.IconAlternative}
+          />
+          <Text variant={TextVariant.BodySm} color={TextColor.TextAlternative}>
+            {t('perpsChartLoadError') ?? 'Failed to load chart data'}
+          </Text>
+        </Box>
+      );
     }
+
+    return (
+      <PerpsCandlestickChart
+        ref={chartRef}
+        height={250}
+        selectedPeriod={selectedPeriod}
+        candleData={candleData}
+        priceLines={chartPriceLines}
+        onNeedMoreHistory={fetchMoreHistory}
+        // onCrosshairMove={setHoveredCandle}
+      />
+    );
   };
 
   return (
@@ -348,6 +999,7 @@ const PerpsMarketDetailPage: React.FC = () => {
     >
       {/* Header */}
       <Box
+        className="sticky top-0 z-10 bg-background-default"
         flexDirection={BoxFlexDirection.Row}
         alignItems={BoxAlignItems.Center}
         paddingLeft={4}
@@ -373,175 +1025,104 @@ const PerpsMarketDetailPage: React.FC = () => {
         {/* Token Logo */}
         <PerpsTokenLogo symbol={market.symbol} size={AvatarTokenSize.Md} />
 
-        {/* Header Content - Different for detail vs order view */}
-        {currentView === 'order' ? (
-          /* Order View: Show mode + direction + asset name, price + change */
-          <Box flexDirection={BoxFlexDirection.Column}>
-            {/* Mode + Direction + Asset */}
+        {/* Header Content: symbol-USD, price + change */}
+        <Box flexDirection={BoxFlexDirection.Column}>
+          <Text variant={TextVariant.BodySm} fontWeight={FontWeight.Medium}>
+            {displayName}-USD
+          </Text>
+          <Box
+            flexDirection={BoxFlexDirection.Row}
+            alignItems={BoxAlignItems.Baseline}
+            gap={1}
+          >
             <Text
-              variant={TextVariant.BodyMd}
+              variant={TextVariant.BodySm}
               fontWeight={FontWeight.Medium}
-              color={TextColor.TextDefault}
+              data-testid="perps-market-detail-price"
             >
-              {getHeaderText()}
+              {displayPrice}
             </Text>
-
-            {/* Price and Change Row */}
-            <Box
-              flexDirection={BoxFlexDirection.Row}
-              alignItems={BoxAlignItems.Baseline}
-              gap={1}
+            <Text
+              variant={TextVariant.BodyXs}
+              color={getChangeColor(displayChange)}
+              data-testid="perps-market-detail-change"
             >
-              <Text
-                variant={TextVariant.BodySm}
-                color={TextColor.TextAlternative}
-                data-testid="perps-order-price"
-              >
-                {market.price}
-              </Text>
-              <Text
-                variant={TextVariant.BodyXs}
-                color={getChangeColor(market.change24hPercent)}
-                data-testid="perps-order-change"
-              >
-                {market.change24hPercent}
-              </Text>
-            </Box>
-          </Box>
-        ) : (
-          /* Detail View: Show symbol-USD, price + change */
-          <Box flexDirection={BoxFlexDirection.Column}>
-            {/* Symbol */}
-            <Text variant={TextVariant.BodySm} fontWeight={FontWeight.Medium}>
-              {displayName}-USD
+              {displayChange}
             </Text>
-
-            {/* Price and Change Row */}
-            <Box
-              flexDirection={BoxFlexDirection.Row}
-              alignItems={BoxAlignItems.Baseline}
-              gap={1}
-            >
-              <Text
-                variant={TextVariant.BodySm}
-                fontWeight={FontWeight.Medium}
-                data-testid="perps-market-detail-price"
-              >
-                {market.price}
-              </Text>
-              <Text
-                variant={TextVariant.BodyXs}
-                color={getChangeColor(market.change24hPercent)}
-                data-testid="perps-market-detail-change"
-              >
-                {market.change24h} ({market.change24hPercent})
-              </Text>
-            </Box>
           </Box>
-        )}
+        </Box>
 
-        {/* Spacer */}
         <Box className="flex-1" />
 
-        {/* Right Side Action - Different for detail vs order view */}
-        {currentView === 'order' ? (
-          /* Order View: Market/Limit Dropdown */
-          <Box className="relative">
+        <Box
+          data-testid="perps-market-detail-favorite-button"
+          aria-label={
+            isInWatchlist
+              ? t('perpsRemoveFromFavorites')
+              : t('perpsAddToFavorites')
+          }
+          className="p-2 cursor-pointer"
+          onClick={handleFavoriteClick}
+        >
+          <Icon
+            name={isInWatchlist ? IconName.StarFilled : IconName.Star}
+            size={IconSize.Md}
+            color={
+              isInWatchlist ? IconColor.IconDefault : IconColor.IconAlternative
+            }
+          />
+        </Box>
+      </Box>
+
+      {/* OHLCV Bar — commented out for now
+      {hoveredCandle && (
+        <Box
+          flexDirection={BoxFlexDirection.Row}
+          justifyContent={BoxJustifyContent.Between}
+          paddingLeft={4}
+          paddingRight={4}
+          paddingBottom={1}
+          data-testid="perps-ohlcv-bar"
+        >
+          {[
+            { label: 'Open', value: hoveredCandle.open },
+            { label: 'Close', value: hoveredCandle.close },
+            { label: 'High', value: hoveredCandle.high },
+            { label: 'Low', value: hoveredCandle.low },
+          ].map(({ label, value }) => (
             <Box
-              data-testid="perps-order-type-dropdown"
-              onClick={() =>
-                setIsOrderTypeDropdownOpen(!isOrderTypeDropdownOpen)
-              }
-              className={twMerge(
-                'flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer',
-                'bg-muted hover:bg-muted-hover',
-              )}
+              key={label}
+              flexDirection={BoxFlexDirection.Column}
+              alignItems={BoxAlignItems.Start}
             >
               <Text variant={TextVariant.BodySm} fontWeight={FontWeight.Medium}>
-                {orderType === 'market' ? t('perpsMarket') : t('perpsLimit')}
+                {`$${formatNumber(parseFloat(value), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`}
               </Text>
-              <Icon
-                name={IconName.ArrowDown}
-                size={IconSize.Xs}
-                color={IconColor.IconAlternative}
-              />
-            </Box>
-
-            {/* Dropdown Menu */}
-            {isOrderTypeDropdownOpen && (
-              <Box
-                className="absolute right-0 top-full mt-1 bg-default border border-muted rounded-lg shadow-lg z-10 min-w-[100px]"
-                data-testid="perps-order-type-dropdown-menu"
+              <Text
+                variant={TextVariant.BodyXs}
+                color={TextColor.TextAlternative}
               >
-                <Box
-                  onClick={() => {
-                    setOrderType('market');
-                    setIsOrderTypeDropdownOpen(false);
-                  }}
-                  className={twMerge(
-                    'px-3 py-2 cursor-pointer rounded-t-lg',
-                    orderType === 'market'
-                      ? 'bg-primary-muted'
-                      : 'hover:bg-muted-hover',
-                  )}
-                  data-testid="perps-order-type-market"
-                >
-                  <Text
-                    variant={TextVariant.BodySm}
-                    color={
-                      orderType === 'market'
-                        ? TextColor.PrimaryDefault
-                        : TextColor.TextDefault
-                    }
-                  >
-                    {t('perpsMarket')}
-                  </Text>
-                </Box>
-                <Box
-                  onClick={() => {
-                    setOrderType('limit');
-                    setIsOrderTypeDropdownOpen(false);
-                  }}
-                  className={twMerge(
-                    'px-3 py-2 cursor-pointer rounded-b-lg',
-                    orderType === 'limit'
-                      ? 'bg-primary-muted'
-                      : 'hover:bg-muted-hover',
-                  )}
-                  data-testid="perps-order-type-limit"
-                >
-                  <Text
-                    variant={TextVariant.BodySm}
-                    color={
-                      orderType === 'limit'
-                        ? TextColor.PrimaryDefault
-                        : TextColor.TextDefault
-                    }
-                  >
-                    {t('perpsLimit')}
-                  </Text>
-                </Box>
-              </Box>
-            )}
-          </Box>
-        ) : (
-          /* Detail View: Favorite Star */
+                {label}
+              </Text>
+            </Box>
+          ))}
           <Box
-            data-testid="perps-market-detail-favorite-button"
-            aria-label={t('perpsAddToFavorites')}
-            className="p-2 cursor-pointer"
-            onClick={() => {
-              // TODO: Handle favorite toggle
-            }}
+            flexDirection={BoxFlexDirection.Column}
+            alignItems={BoxAlignItems.End}
           >
-            <Icon
-              name={IconName.Star}
-              size={IconSize.Md}
-              color={IconColor.IconAlternative}
-            />
+            <Text variant={TextVariant.BodySm} fontWeight={FontWeight.Medium}>
+              {`$${formatNumber(parseFloat(hoveredCandle.volume) * parseFloat(hoveredCandle.close), { notation: 'compact', maximumFractionDigits: 2 })}`}
+            </Text>
+            <Text
+              variant={TextVariant.BodyXs}
+              color={TextColor.TextAlternative}
+            >
+              Volume
+            </Text>
           </Box>
-        )}
-      </Box>
+        </Box>
+      )}
+      */}
 
       {/* Candlestick Chart */}
       <Box
@@ -549,11 +1130,7 @@ const PerpsMarketDetailPage: React.FC = () => {
         paddingRight={4}
         data-testid="perps-market-detail-chart"
       >
-        <PerpsCandlestickChart
-          ref={chartRef}
-          height={250}
-          selectedPeriod={selectedPeriod}
-        />
+        {renderChartContent()}
       </Box>
 
       {/* Candle Period Selector */}
@@ -562,171 +1139,178 @@ const PerpsMarketDetailPage: React.FC = () => {
         onPeriodChange={handlePeriodChange}
       />
 
-      {/* Order Entry View - shown when in order mode */}
-      {currentView === 'order' && (
-        <Box paddingLeft={4} paddingRight={4} paddingTop={4} className="flex-1">
-          <OrderEntry
-            asset={decodedSymbol}
-            currentPrice={currentPrice}
-            maxLeverage={maxLeverage}
-            availableBalance={availableBalance}
-            initialDirection={orderDirection}
-            showSubmitButton={false}
-            onFormStateChange={handleFormStateChange}
-            mode={orderMode}
-            orderType={orderType}
-            existingPosition={
-              position
-                ? {
-                    size: position.size,
-                    leverage: position.leverage.value,
-                    entryPrice: position.entryPrice,
-                    takeProfitPrice: position.takeProfitPrice,
-                    stopLossPrice: position.stopLossPrice,
-                  }
-                : undefined
-            }
-          />
-        </Box>
-      )}
+      {/* Detail View Content */}
+      <>
+        {/* Position Section */}
+        {position && (
+          <Box paddingLeft={4} paddingRight={4} paddingBottom={4}>
+            <Box paddingBottom={2}>
+              <Text
+                variant={TextVariant.HeadingSm}
+                fontWeight={FontWeight.Medium}
+              >
+                {t('perpsPosition')}
+              </Text>
+            </Box>
 
-      {/* Detail View Content - shown when in detail mode */}
-      {currentView === 'detail' && (
-        <>
-          {/* Position Section */}
-          {position && (
-            <Box paddingLeft={4} paddingRight={4} paddingBottom={4}>
-              <Box paddingBottom={2}>
-                <Text
-                  variant={TextVariant.HeadingSm}
-                  fontWeight={FontWeight.Medium}
-                >
-                  {t('perpsPosition')}
-                </Text>
+            {/* Position Details Cards */}
+            <Box flexDirection={BoxFlexDirection.Column} gap={2} paddingTop={2}>
+              {/* First Row: P&L and Return */}
+              <Box flexDirection={BoxFlexDirection.Row} gap={2}>
+                {/* P&L Card */}
+                <Box className="flex-1 rounded-xl bg-muted px-4 py-3">
+                  <Box paddingBottom={1}>
+                    <Text
+                      variant={TextVariant.BodySm}
+                      color={TextColor.TextAlternative}
+                    >
+                      {t('perpsPnl')}
+                    </Text>
+                  </Box>
+                  <Text
+                    variant={TextVariant.BodyMd}
+                    fontWeight={FontWeight.Medium}
+                    color={
+                      parseFloat(position.unrealizedPnl) >= 0
+                        ? TextColor.SuccessDefault
+                        : TextColor.ErrorDefault
+                    }
+                  >
+                    {formatPnl(position.unrealizedPnl)}
+                  </Text>
+                </Box>
+
+                {/* Return Card */}
+                <Box className="flex-1 rounded-xl bg-muted px-4 py-3">
+                  <Box paddingBottom={1}>
+                    <Text
+                      variant={TextVariant.BodySm}
+                      color={TextColor.TextAlternative}
+                    >
+                      {t('perpsReturn')}
+                    </Text>
+                  </Box>
+                  <Text
+                    variant={TextVariant.BodyMd}
+                    fontWeight={FontWeight.Medium}
+                    color={
+                      parseFloat(position.returnOnEquity) >= 0
+                        ? TextColor.SuccessDefault
+                        : TextColor.ErrorDefault
+                    }
+                  >
+                    {/* Controller/mobile ROE is a ratio (e.g. 0.1579), same as what the formatter expects. */}
+                    {formatPercentWithMinThreshold(
+                      Number.parseFloat(position.returnOnEquity),
+                    )}
+                  </Text>
+                </Box>
               </Box>
 
-              {/* Position Details Cards */}
-              <Box
-                flexDirection={BoxFlexDirection.Column}
-                gap={2}
-                paddingTop={2}
-              >
-                {/* First Row: P&L and Return */}
-                <Box flexDirection={BoxFlexDirection.Row} gap={2}>
-                  {/* P&L Card */}
-                  <Box className="flex-1 rounded-xl bg-muted px-4 py-3">
-                    <Box paddingBottom={1}>
-                      <Text
-                        variant={TextVariant.BodySm}
-                        color={TextColor.TextAlternative}
-                      >
-                        {t('perpsPnl')}
-                      </Text>
-                    </Box>
-                    <Text
-                      variant={TextVariant.BodyMd}
-                      fontWeight={FontWeight.Medium}
-                      color={
-                        parseFloat(position.unrealizedPnl) >= 0
-                          ? TextColor.SuccessDefault
-                          : TextColor.ErrorDefault
-                      }
-                    >
-                      {parseFloat(position.unrealizedPnl) >= 0 ? '+' : '-'}
-                      {formatCurrencyWithMinThreshold(
-                        Math.abs(parseFloat(position.unrealizedPnl)),
-                        'USD',
-                      )}
-                    </Text>
-                  </Box>
-
-                  {/* Return Card */}
-                  <Box className="flex-1 rounded-xl bg-muted px-4 py-3">
-                    <Box paddingBottom={1}>
-                      <Text
-                        variant={TextVariant.BodySm}
-                        color={TextColor.TextAlternative}
-                      >
-                        {t('perpsReturn')}
-                      </Text>
-                    </Box>
-                    <Text
-                      variant={TextVariant.BodyMd}
-                      fontWeight={FontWeight.Medium}
-                      color={
-                        parseFloat(position.returnOnEquity) >= 0
-                          ? TextColor.SuccessDefault
-                          : TextColor.ErrorDefault
-                      }
-                    >
-                      {parseFloat(position.returnOnEquity) >= 0 ? '+' : ''}
-                      {position.returnOnEquity}%
-                    </Text>
-                  </Box>
-                </Box>
-
-                {/* Second Row: Size and Margin */}
-                <Box flexDirection={BoxFlexDirection.Row} gap={2}>
-                  {/* Size Card */}
-                  <Box
-                    className="flex-1 cursor-pointer rounded-xl bg-muted px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed"
-                    flexDirection={BoxFlexDirection.Column}
-                    onClick={() => {
-                      // TODO: Handle size card press
-                    }}
-                  >
-                    <Box paddingBottom={1}>
-                      <Text
-                        variant={TextVariant.BodySm}
-                        color={TextColor.TextAlternative}
-                      >
-                        {t('perpsSize')}
-                      </Text>
-                    </Box>
-                    <Text
-                      variant={TextVariant.BodyMd}
-                      fontWeight={FontWeight.Medium}
-                    >
-                      {formatTokenQuantity(
-                        Math.abs(parseFloat(position.size)),
-                        getDisplayName(position.coin),
-                      )}
-                    </Text>
-                  </Box>
-
-                  {/* Margin Card */}
-                  <Box
-                    className="flex-1 cursor-pointer rounded-xl bg-muted px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed"
-                    flexDirection={BoxFlexDirection.Column}
-                    onClick={() => {
-                      // TODO: Handle margin card press
-                    }}
-                  >
-                    <Box paddingBottom={1}>
-                      <Text
-                        variant={TextVariant.BodySm}
-                        color={TextColor.TextAlternative}
-                      >
-                        {t('perpsMargin')}
-                      </Text>
-                    </Box>
-                    <Text
-                      variant={TextVariant.BodyMd}
-                      fontWeight={FontWeight.Medium}
-                    >
-                      ${position.marginUsed}
-                    </Text>
-                  </Box>
-                </Box>
-
-                {/* Third Row: Auto Close (Full Width) */}
+              {/* Second Row: Size and Margin */}
+              <Box flexDirection={BoxFlexDirection.Row} gap={2}>
+                {/* Size Card */}
                 <Box
-                  className="cursor-pointer rounded-xl bg-muted px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed"
+                  className="flex-1 cursor-pointer rounded-xl bg-muted px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed"
                   flexDirection={BoxFlexDirection.Column}
                   onClick={() => {
-                    // TODO: Handle auto close card press
+                    setShowSizeInFiat((prev) => !prev);
                   }}
                 >
+                  <Box paddingBottom={1}>
+                    <Text
+                      variant={TextVariant.BodySm}
+                      color={TextColor.TextAlternative}
+                    >
+                      {t('perpsSize')}
+                    </Text>
+                  </Box>
+                  <Text
+                    variant={TextVariant.BodyMd}
+                    fontWeight={FontWeight.Medium}
+                    data-testid="perps-position-size-value"
+                  >
+                    {showSizeInFiat && Boolean(position.entryPrice)
+                      ? formatPerpsFiatUniversal(
+                          Math.abs(parseFloat(position.size)) *
+                            parsePerpsDisplayPrice(position.entryPrice),
+                        )
+                      : `${formatPositionSize(
+                          Math.abs(parseFloat(position.size)),
+                          marketInfo?.szDecimals,
+                        )} ${getDisplayName(position.symbol)}`}
+                  </Text>
+                </Box>
+
+                {/* Margin Card - click to open Add/Remove margin popover */}
+                <Box
+                  ref={marginMenuRef}
+                  className="relative flex-1 rounded-xl bg-muted px-4 py-3 cursor-pointer hover:bg-muted-hover active:bg-muted-pressed transition-colors"
+                  flexDirection={BoxFlexDirection.Column}
+                  onClick={handleOpenMarginMenu}
+                  data-testid="perps-margin-card"
+                >
+                  <Box paddingBottom={1}>
+                    <Text
+                      variant={TextVariant.BodySm}
+                      color={TextColor.TextAlternative}
+                    >
+                      {t('perpsMargin')}
+                    </Text>
+                  </Box>
+                  <Text
+                    variant={TextVariant.BodyMd}
+                    fontWeight={FontWeight.Medium}
+                    data-testid="perps-position-margin-value"
+                  >
+                    {formatPerpsFiatMinimal(position.marginUsed)}
+                  </Text>
+                  <Popover
+                    referenceElement={marginMenuRef.current}
+                    isOpen={isMarginMenuOpen}
+                    isPortal
+                    onClickOutside={() => setIsMarginMenuOpen(false)}
+                    onPressEscKey={() => setIsMarginMenuOpen(false)}
+                    position={PopoverPosition.Top}
+                    preventOverflow
+                    flip
+                    offset={[0, 8]}
+                    padding={0}
+                    className="min-w-[220px] rounded-lg z-[1050]"
+                    data-testid="perps-margin-menu"
+                  >
+                    <Box flexDirection={BoxFlexDirection.Column}>
+                      <PopoverMenuItem
+                        icon={IconName.Add}
+                        label={t('perpsAddMargin')}
+                        description={t('perpsAddMarginDescription')}
+                        onClick={handleOpenAddMarginModal}
+                        className="rounded-t-lg py-3"
+                        data-testid="perps-margin-menu-add"
+                      />
+                      <PopoverMenuItem
+                        icon={IconName.Minus}
+                        label={t('perpsRemoveMargin')}
+                        description={t('perpsRemoveMarginDescription')}
+                        onClick={handleOpenDecreaseMarginModal}
+                        className="rounded-b-lg py-3"
+                        data-testid="perps-margin-menu-remove"
+                      />
+                    </Box>
+                  </Popover>
+                </Box>
+              </Box>
+
+              {/* Third Row: Auto Close - Click to open modal */}
+              <Box
+                className="rounded-xl bg-muted cursor-pointer px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed transition-colors"
+                flexDirection={BoxFlexDirection.Row}
+                justifyContent={BoxJustifyContent.Between}
+                alignItems={BoxAlignItems.Center}
+                onClick={handleOpenTPSLModal}
+                data-testid="perps-auto-close-row"
+              >
+                <Box flexDirection={BoxFlexDirection.Column}>
                   <Box paddingBottom={1}>
                     <Text
                       variant={TextVariant.BodySm}
@@ -735,20 +1319,46 @@ const PerpsMarketDetailPage: React.FC = () => {
                       {t('perpsAutoClose')}
                     </Text>
                   </Box>
-                  <Text
-                    variant={TextVariant.BodyMd}
-                    fontWeight={FontWeight.Medium}
+                  <Box
+                    flexDirection={BoxFlexDirection.Row}
+                    alignItems={BoxAlignItems.Center}
+                    gap={1}
                   >
-                    TP{' '}
-                    {position.takeProfitPrice
-                      ? `$${position.takeProfitPrice}`
-                      : '-'}
-                    , SL{' '}
-                    {position.stopLossPrice
-                      ? `$${position.stopLossPrice}`
-                      : '-'}
-                  </Text>
+                    <Text
+                      variant={TextVariant.BodyMd}
+                      fontWeight={FontWeight.Medium}
+                    >
+                      TP{' '}
+                    </Text>
+                    <Text
+                      variant={TextVariant.BodyMd}
+                      fontWeight={FontWeight.Medium}
+                    >
+                      {position.takeProfitPrice
+                        ? formatPerpsFiatUniversal(position.takeProfitPrice)
+                        : '-'}
+                    </Text>
+                    <Text
+                      variant={TextVariant.BodyMd}
+                      fontWeight={FontWeight.Medium}
+                    >
+                      , SL{' '}
+                    </Text>
+                    <Text
+                      variant={TextVariant.BodyMd}
+                      fontWeight={FontWeight.Medium}
+                    >
+                      {position.stopLossPrice
+                        ? formatPerpsFiatUniversal(position.stopLossPrice)
+                        : '-'}
+                    </Text>
+                  </Box>
                 </Box>
+                <Icon
+                  name={IconName.ArrowRight}
+                  size={IconSize.Sm}
+                  color={IconColor.IconAlternative}
+                />
               </Box>
 
               {/* Details Section */}
@@ -782,10 +1392,12 @@ const PerpsMarketDetailPage: React.FC = () => {
                         ? TextColor.SuccessDefault
                         : TextColor.ErrorDefault
                     }
+                    data-testid="perps-position-leverage"
                   >
                     {parseFloat(position.size) >= 0
                       ? t('perpsLong')
-                      : t('perpsShort')}
+                      : t('perpsShort')}{' '}
+                    {position.leverage.value}x
                   </Text>
                 </Box>
 
@@ -805,8 +1417,9 @@ const PerpsMarketDetailPage: React.FC = () => {
                   <Text
                     variant={TextVariant.BodySm}
                     fontWeight={FontWeight.Medium}
+                    data-testid="perps-position-entry-value"
                   >
-                    ${position.entryPrice}
+                    {formatPerpsFiatUniversal(position.entryPrice)}
                   </Text>
                 </Box>
 
@@ -826,9 +1439,10 @@ const PerpsMarketDetailPage: React.FC = () => {
                   <Text
                     variant={TextVariant.BodySm}
                     fontWeight={FontWeight.Medium}
+                    data-testid="perps-position-liquidation-value"
                   >
                     {position.liquidationPrice
-                      ? `$${position.liquidationPrice}`
+                      ? formatPerpsFiatUniversal(position.liquidationPrice)
                       : '-'}
                   </Text>
                 </Box>
@@ -849,83 +1463,101 @@ const PerpsMarketDetailPage: React.FC = () => {
                   <Text
                     variant={TextVariant.BodySm}
                     fontWeight={FontWeight.Medium}
+                    data-testid="perps-position-funding-value"
                   >
-                    ${position.cumulativeFunding.sinceOpen}
+                    {(() => {
+                      const fundingSinceOpen = Number.parseFloat(
+                        position.cumulativeFunding.sinceOpen,
+                      );
+                      const isNearZeroFunding =
+                        Math.abs(fundingSinceOpen) < 0.005;
+                      if (isNearZeroFunding) {
+                        return '$0.00';
+                      }
+                      const signPrefix = fundingSinceOpen >= 0 ? '-' : '+';
+                      return `${signPrefix}${formatPerpsFiat(
+                        Math.abs(fundingSinceOpen),
+                        { ranges: PRICE_RANGES_MINIMAL_VIEW },
+                      )}`;
+                    })()}
                   </Text>
                 </Box>
               </Box>
             </Box>
-          )}
+          </Box>
+        )}
 
-          {/* Orders Section - shown regardless of position, but only if there are orders */}
-          {orders.length > 0 && (
-            <Box paddingLeft={4} paddingRight={4} paddingBottom={4}>
-              <Box paddingBottom={2}>
-                <Text
-                  variant={TextVariant.HeadingSm}
-                  fontWeight={FontWeight.Medium}
-                >
-                  {t('perpsOrders')}
-                </Text>
-              </Box>
-              <Box
-                flexDirection={BoxFlexDirection.Column}
-                className="overflow-hidden rounded-xl"
-              >
-                {orders.map((order) => (
-                  <OrderCard
-                    key={order.orderId}
-                    order={order}
-                    variant="muted"
-                    onClick={handleOrderClick}
-                  />
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {/* Stats Section - always visible */}
-          <Box paddingLeft={4} paddingRight={4}>
-            <Box paddingTop={4} paddingBottom={2}>
+        {/* Orders Section - shown regardless of position, but only if there are orders */}
+        {orders.length > 0 && (
+          <Box paddingLeft={4} paddingRight={4} paddingBottom={4}>
+            <Box paddingBottom={2}>
               <Text
                 variant={TextVariant.HeadingSm}
                 fontWeight={FontWeight.Medium}
               >
-                {t('perpsStats')}
+                {t('perpsOrders')}
               </Text>
             </Box>
             <Box
               flexDirection={BoxFlexDirection.Column}
               className="overflow-hidden rounded-xl"
             >
-              {/* 24h Volume Row */}
+              {orders.map((order) => (
+                <OrderCard
+                  key={order.orderId}
+                  order={order}
+                  variant="muted"
+                  onClick={handleOrderClick}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {/* Stats Section - always visible */}
+        <Box paddingLeft={4} paddingRight={4}>
+          <Box paddingTop={4} paddingBottom={2}>
+            <Text
+              variant={TextVariant.HeadingSm}
+              fontWeight={FontWeight.Medium}
+            >
+              {t('perpsStats')}
+            </Text>
+          </Box>
+          <Box
+            flexDirection={BoxFlexDirection.Column}
+            className="overflow-hidden rounded-xl"
+          >
+            {/* 24h Volume Row */}
+            <Box
+              className="bg-muted px-4 py-3"
+              flexDirection={BoxFlexDirection.Row}
+              justifyContent={BoxJustifyContent.Between}
+              alignItems={BoxAlignItems.Center}
+            >
+              <Text
+                variant={TextVariant.BodySm}
+                color={TextColor.TextAlternative}
+              >
+                {t('perps24hVolume')}
+              </Text>
+              <Text variant={TextVariant.BodySm} fontWeight={FontWeight.Medium}>
+                {market.volume}
+              </Text>
+            </Box>
+
+            {/* Open Interest Row */}
+            {market.openInterest && (
               <Box
                 className="bg-muted px-4 py-3"
                 flexDirection={BoxFlexDirection.Row}
                 justifyContent={BoxJustifyContent.Between}
                 alignItems={BoxAlignItems.Center}
               >
-                <Text
-                  variant={TextVariant.BodySm}
-                  color={TextColor.TextAlternative}
-                >
-                  {t('perps24hVolume')}
-                </Text>
-                <Text
-                  variant={TextVariant.BodySm}
-                  fontWeight={FontWeight.Medium}
-                >
-                  {market.volume}
-                </Text>
-              </Box>
-
-              {/* Open Interest Row */}
-              {market.openInterest && (
                 <Box
-                  className="bg-muted px-4 py-3"
                   flexDirection={BoxFlexDirection.Row}
-                  justifyContent={BoxJustifyContent.Between}
                   alignItems={BoxAlignItems.Center}
+                  gap={1}
                 >
                   <Text
                     variant={TextVariant.BodySm}
@@ -933,22 +1565,39 @@ const PerpsMarketDetailPage: React.FC = () => {
                   >
                     {t('perpsOpenInterest')}
                   </Text>
-                  <Text
-                    variant={TextVariant.BodySm}
-                    fontWeight={FontWeight.Medium}
+                  <Tooltip
+                    position="top"
+                    html={t('perpsOpenInterestTooltip')}
+                    interactive
                   >
-                    {market.openInterest}
-                  </Text>
+                    <Icon
+                      name={IconName.Info}
+                      size={IconSize.Sm}
+                      color={IconColor.IconAlternative}
+                    />
+                  </Tooltip>
                 </Box>
-              )}
+                <Text
+                  variant={TextVariant.BodySm}
+                  fontWeight={FontWeight.Medium}
+                >
+                  {market.openInterest}
+                </Text>
+              </Box>
+            )}
 
-              {/* Funding Rate Row */}
-              {market.fundingRate !== undefined && (
+            {/* Funding Rate Row */}
+            {market.fundingRate !== undefined && (
+              <Box
+                className="bg-muted px-4 py-3"
+                flexDirection={BoxFlexDirection.Row}
+                justifyContent={BoxJustifyContent.Between}
+                alignItems={BoxAlignItems.Center}
+              >
                 <Box
-                  className="bg-muted px-4 py-3"
                   flexDirection={BoxFlexDirection.Row}
-                  justifyContent={BoxJustifyContent.Between}
                   alignItems={BoxAlignItems.Center}
+                  gap={1}
                 >
                   <Text
                     variant={TextVariant.BodySm}
@@ -956,6 +1605,23 @@ const PerpsMarketDetailPage: React.FC = () => {
                   >
                     {t('perpsFundingRate')}
                   </Text>
+                  <Tooltip
+                    position="top"
+                    html={t('perpsFundingRateTooltip')}
+                    interactive
+                  >
+                    <Icon
+                      name={IconName.Info}
+                      size={IconSize.Sm}
+                      color={IconColor.IconAlternative}
+                    />
+                  </Tooltip>
+                </Box>
+                <Box
+                  flexDirection={BoxFlexDirection.Row}
+                  alignItems={BoxAlignItems.Center}
+                  gap={1}
+                >
                   <Text
                     variant={TextVariant.BodySm}
                     fontWeight={FontWeight.Medium}
@@ -965,182 +1631,105 @@ const PerpsMarketDetailPage: React.FC = () => {
                         : TextColor.ErrorDefault
                     }
                   >
-                    {market.fundingRate >= 0 ? '+' : ''}
-                    {formatNumber(market.fundingRate * 100, {
-                      minimumFractionDigits: 4,
-                      maximumFractionDigits: 4,
-                    })}
-                    %
+                    {formatFundingRate(market.fundingRate)}
+                  </Text>
+                  <Text
+                    variant={TextVariant.BodySm}
+                    color={TextColor.TextAlternative}
+                  >
+                    ({fundingCountdown})
                   </Text>
                 </Box>
-              )}
-            </Box>
-          </Box>
+              </Box>
+            )}
 
-          {/* Recent Activity Section - always visible */}
-          <Box paddingLeft={4} paddingRight={4}>
-            <Box paddingTop={4} paddingBottom={2}>
-              <Text
-                variant={TextVariant.HeadingSm}
-                fontWeight={FontWeight.Medium}
-              >
-                {t('perpsRecentActivity')}
-              </Text>
-            </Box>
+            {/* Oracle Price Row */}
             <Box
-              flexDirection={BoxFlexDirection.Column}
-              className="overflow-hidden rounded-xl"
-            >
-              {/* Activity Item 1 - Opened long */}
-              <Box
-                className="w-full bg-muted px-4 py-3"
-                flexDirection={BoxFlexDirection.Row}
-                alignItems={BoxAlignItems.Center}
-                gap={3}
-              >
-                <PerpsTokenLogo
-                  symbol={market.symbol}
-                  size={AvatarTokenSize.Md}
-                />
-                <Box
-                  flexDirection={BoxFlexDirection.Column}
-                  alignItems={BoxAlignItems.Start}
-                  className="min-w-0 flex-1"
-                  gap={1}
-                >
-                  <Text
-                    variant={TextVariant.BodySm}
-                    fontWeight={FontWeight.Medium}
-                  >
-                    {t('perpsOpenedLong')}
-                  </Text>
-                  <Text
-                    variant={TextVariant.BodyXs}
-                    color={TextColor.TextAlternative}
-                  >
-                    2.50000 {displayName}
-                  </Text>
-                </Box>
-                <Text
-                  variant={TextVariant.BodySm}
-                  fontWeight={FontWeight.Medium}
-                  color={TextColor.SuccessDefault}
-                >
-                  +$125.00
-                </Text>
-              </Box>
-
-              {/* Activity Item 2 - Increased position */}
-              <Box
-                className="w-full bg-muted px-4 py-3"
-                flexDirection={BoxFlexDirection.Row}
-                alignItems={BoxAlignItems.Center}
-                gap={3}
-              >
-                <PerpsTokenLogo
-                  symbol={market.symbol}
-                  size={AvatarTokenSize.Md}
-                />
-                <Box
-                  flexDirection={BoxFlexDirection.Column}
-                  alignItems={BoxAlignItems.Start}
-                  className="min-w-0 flex-1"
-                  gap={1}
-                >
-                  <Text
-                    variant={TextVariant.BodySm}
-                    fontWeight={FontWeight.Medium}
-                  >
-                    {t('perpsIncreasedPosition')}
-                  </Text>
-                  <Text
-                    variant={TextVariant.BodyXs}
-                    color={TextColor.TextAlternative}
-                  >
-                    0.50000 {displayName}
-                  </Text>
-                </Box>
-                <Text
-                  variant={TextVariant.BodySm}
-                  fontWeight={FontWeight.Medium}
-                  color={TextColor.SuccessDefault}
-                >
-                  +$45.20
-                </Text>
-              </Box>
-
-              {/* Activity Item 3 - Closed short */}
-              <Box
-                className="w-full bg-muted px-4 py-3"
-                flexDirection={BoxFlexDirection.Row}
-                alignItems={BoxAlignItems.Center}
-                gap={3}
-              >
-                <PerpsTokenLogo
-                  symbol={market.symbol}
-                  size={AvatarTokenSize.Md}
-                />
-                <Box
-                  flexDirection={BoxFlexDirection.Column}
-                  alignItems={BoxAlignItems.Start}
-                  className="min-w-0 flex-1"
-                  gap={1}
-                >
-                  <Text
-                    variant={TextVariant.BodySm}
-                    fontWeight={FontWeight.Medium}
-                  >
-                    {t('perpsClosedShort')}
-                  </Text>
-                  <Text
-                    variant={TextVariant.BodyXs}
-                    color={TextColor.TextAlternative}
-                  >
-                    1.25000 {displayName}
-                  </Text>
-                </Box>
-                <Text
-                  variant={TextVariant.BodySm}
-                  fontWeight={FontWeight.Medium}
-                  color={TextColor.ErrorDefault}
-                >
-                  -$32.50
-                </Text>
-              </Box>
-            </Box>
-
-            {/* Learn Section */}
-            <Box
-              className="mt-4 w-full cursor-pointer rounded-xl bg-muted px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed"
+              className="bg-muted px-4 py-3"
               flexDirection={BoxFlexDirection.Row}
               justifyContent={BoxJustifyContent.Between}
               alignItems={BoxAlignItems.Center}
-              onClick={() => {
-                // TODO: Navigate to learn page
-              }}
             >
-              <Text variant={TextVariant.BodyMd} fontWeight={FontWeight.Medium}>
-                {t('perpsLearnBasics')}
-              </Text>
-              <Icon
-                name={IconName.ArrowRight}
-                size={IconSize.Sm}
-                color={IconColor.IconAlternative}
-              />
-            </Box>
-
-            {/* Disclaimer */}
-            <Box paddingTop={4} paddingBottom={4}>
-              <Text
-                variant={TextVariant.BodyXs}
-                color={TextColor.TextAlternative}
+              <Box
+                flexDirection={BoxFlexDirection.Row}
+                alignItems={BoxAlignItems.Center}
+                gap={1}
               >
-                {t('perpsDisclaimer')}
+                <Text
+                  variant={TextVariant.BodySm}
+                  color={TextColor.TextAlternative}
+                >
+                  {t('perpsOraclePrice')}
+                </Text>
+                <Tooltip
+                  position="top"
+                  html={t('perpsOraclePriceTooltip')}
+                  interactive
+                >
+                  <Icon
+                    name={IconName.Info}
+                    size={IconSize.Sm}
+                    color={IconColor.IconAlternative}
+                  />
+                </Tooltip>
+              </Box>
+              <Text
+                variant={TextVariant.BodySm}
+                fontWeight={FontWeight.Medium}
+                data-testid="perps-market-detail-oracle-price"
+              >
+                {livePrice?.markPrice
+                  ? formatPerpsFiatUniversal(livePrice.markPrice)
+                  : '—'}
               </Text>
             </Box>
           </Box>
-        </>
-      )}
+        </Box>
+
+        {/* Recent Activity Section - always visible */}
+        <Box paddingLeft={4} paddingRight={4}>
+          <PerpsMarketRecentActivity symbol={decodedSymbol} />
+
+          {/* Learn Section */}
+          <Box
+            className="mt-4 w-full cursor-pointer rounded-xl bg-muted px-4 py-3 hover:bg-muted-hover active:bg-muted-pressed"
+            flexDirection={BoxFlexDirection.Row}
+            justifyContent={BoxJustifyContent.Between}
+            alignItems={BoxAlignItems.Center}
+            data-testid="perps-learn-basics"
+            onClick={() => {
+              track(MetaMetricsEventName.PerpsUiInteraction, {
+                [PERPS_EVENT_PROPERTY.INTERACTION_TYPE]:
+                  PERPS_EVENT_VALUE.INTERACTION_TYPE.BUTTON_CLICKED,
+                [PERPS_EVENT_PROPERTY.BUTTON_TYPE]:
+                  PERPS_EVENT_VALUE.BUTTON_CLICKED.TUTORIAL,
+                [PERPS_EVENT_PROPERTY.BUTTON_LOCATION]:
+                  PERPS_EVENT_VALUE.BUTTON_LOCATION.ASSET_DETAILS,
+              });
+              dispatch(setTutorialModalOpen(true));
+            }}
+          >
+            <Text variant={TextVariant.BodyMd} fontWeight={FontWeight.Medium}>
+              {t('perpsLearnBasics')}
+            </Text>
+            <Icon
+              name={IconName.ArrowRight}
+              size={IconSize.Sm}
+              color={IconColor.IconAlternative}
+            />
+          </Box>
+
+          {/* Disclaimer */}
+          <Box paddingTop={4} paddingBottom={4}>
+            <Text
+              variant={TextVariant.BodyXs}
+              color={TextColor.TextAlternative}
+            >
+              {t('perpsDisclaimer')}
+            </Text>
+          </Box>
+        </Box>
+      </>
 
       {/* Sticky Footer */}
       <Box
@@ -1150,64 +1739,111 @@ const PerpsMarketDetailPage: React.FC = () => {
         paddingTop={3}
         paddingBottom={4}
       >
-        {/* Order Mode: Show Submit Order button */}
-        {currentView === 'order' && (
-          <Button
-            variant={ButtonVariant.Primary}
-            size={ButtonSize.Lg}
-            onClick={handleOrderSubmit}
-            className={twMerge(
-              'w-full',
-              isLong
-                ? 'bg-success-default hover:bg-success-hover active:bg-success-pressed'
-                : 'bg-error-default hover:bg-error-hover active:bg-error-pressed',
-            )}
-            data-testid="submit-order-button"
-          >
-            {submitButtonText}
-          </Button>
-        )}
-
-        {/* Detail Mode with Position: Show Modify and Close buttons */}
-        {currentView !== 'order' && position && (
+        {/* With Position: Show Modify dropdown and Close button */}
+        {position && (
           <Box
             flexDirection={BoxFlexDirection.Row}
             gap={3}
             data-testid="perps-position-cta-buttons"
           >
-            {/* Modify Button */}
-            <Button
-              variant={ButtonVariant.Secondary}
-              size={ButtonSize.Lg}
-              onClick={handleModifyPosition}
-              className="flex-1"
-              data-testid="perps-modify-cta-button"
-            >
-              {t('perpsModify')}
-            </Button>
+            {/* Modify dropdown */}
+            <Box ref={modifyMenuRef} className="flex-1 min-w-0">
+              <Button
+                variant={ButtonVariant.Secondary}
+                size={ButtonSize.Lg}
+                onClick={() => {
+                  if (!isEligible) {
+                    setIsGeoBlockModalOpen(true);
+                    return;
+                  }
+                  setIsModifyMenuOpen((prev) => !prev);
+                }}
+                className="w-full flex items-center gap-2"
+                data-testid="perps-modify-cta-button"
+              >
+                {t('perpsModify')}
+                <Icon
+                  name={
+                    isModifyMenuOpen ? IconName.ArrowUp : IconName.ArrowDown
+                  }
+                  size={IconSize.Sm}
+                  color={IconColor.IconDefault}
+                />
+              </Button>
+              <Popover
+                referenceElement={modifyMenuRef.current}
+                isOpen={isModifyMenuOpen}
+                isPortal
+                onClickOutside={() => setIsModifyMenuOpen(false)}
+                onPressEscKey={() => setIsModifyMenuOpen(false)}
+                position={PopoverPosition.Top}
+                preventOverflow
+                flip
+                offset={[0, 8]}
+                padding={0}
+                matchWidth
+                className="rounded-lg z-[1050]"
+                data-testid="perps-modify-menu"
+              >
+                <Box flexDirection={BoxFlexDirection.Column}>
+                  <PopoverMenuItem
+                    icon={IconName.Add}
+                    label={t('perpsAddExposure')}
+                    description={
+                      parseFloat(position.size) >= 0
+                        ? t('perpsAddExposureDescriptionLong')
+                        : t('perpsAddExposureDescriptionShort')
+                    }
+                    onClick={handleAddExposure}
+                    className="rounded-t-lg"
+                    data-testid="perps-modify-menu-add-exposure"
+                  />
+                  <PopoverMenuItem
+                    icon={IconName.Minus}
+                    label={t('perpsReduceExposure')}
+                    description={
+                      parseFloat(position.size) >= 0
+                        ? t('perpsReduceExposureDescriptionLong')
+                        : t('perpsReduceExposureDescriptionShort')
+                    }
+                    onClick={handleReduceExposure}
+                    data-testid="perps-modify-menu-reduce-exposure"
+                  />
+                  <PopoverMenuItem
+                    icon={IconName.SwapHorizontal}
+                    label={t('perpsReversePosition')}
+                    description={
+                      parseFloat(position.size) >= 0
+                        ? t('perpsReversePositionDescriptionLong')
+                        : t('perpsReversePositionDescriptionShort')
+                    }
+                    onClick={handleOpenReverseModal}
+                    className="rounded-b-lg"
+                    data-testid="perps-modify-menu-reverse-position"
+                  />
+                </Box>
+              </Popover>
+            </Box>
 
-            {/* Close Button */}
-            <Button
-              variant={ButtonVariant.Primary}
-              size={ButtonSize.Lg}
-              onClick={handleClosePosition}
-              className={twMerge(
-                'flex-1',
-                parseFloat(position.size) >= 0
-                  ? 'bg-success-default hover:bg-success-hover active:bg-success-pressed'
-                  : 'bg-error-default hover:bg-error-hover active:bg-error-pressed',
-              )}
-              data-testid="perps-close-cta-button"
-            >
-              {parseFloat(position.size) >= 0
-                ? t('perpsCloseLong')
-                : t('perpsCloseShort')}
-            </Button>
+            {/* Close Button - White / Primary style */}
+            <Box className="flex-1 min-w-0">
+              <Button
+                variant={ButtonVariant.Primary}
+                size={ButtonSize.Lg}
+                onClick={handleClosePosition}
+                className="w-full"
+                data-testid="perps-close-cta-button"
+              >
+                {parseFloat(position.size) >= 0
+                  ? t('perpsCloseLong')
+                  : t('perpsCloseShort')}
+              </Button>
+            </Box>
           </Box>
         )}
 
-        {/* Detail Mode without Position: Show Long and Short buttons */}
-        {currentView !== 'order' && !position && (
+        {/* Without Position: Show Long and Short buttons */}
+        {!position && (
           <Box
             flexDirection={BoxFlexDirection.Row}
             gap={3}
@@ -1218,10 +1854,8 @@ const PerpsMarketDetailPage: React.FC = () => {
               variant={ButtonVariant.Primary}
               size={ButtonSize.Lg}
               onClick={() => handleOpenOrder('long')}
-              className={twMerge(
-                'flex-1',
-                'bg-success-default hover:bg-success-hover active:bg-success-pressed',
-              )}
+              disabled={isLoadingAccount}
+              className="flex-1"
               data-testid="perps-long-cta-button"
             >
               {t('perpsLong')}
@@ -1232,10 +1866,8 @@ const PerpsMarketDetailPage: React.FC = () => {
               variant={ButtonVariant.Primary}
               size={ButtonSize.Lg}
               onClick={() => handleOpenOrder('short')}
-              className={twMerge(
-                'flex-1',
-                'bg-error-default hover:bg-error-hover active:bg-error-pressed',
-              )}
+              disabled={isLoadingAccount}
+              className="flex-1"
               data-testid="perps-short-cta-button"
             >
               {t('perpsShort')}
@@ -1243,6 +1875,68 @@ const PerpsMarketDetailPage: React.FC = () => {
           </Box>
         )}
       </Box>
+
+      {/* Add / Decrease margin modals (from Modify menu) */}
+      {position && selectedAddress && marginModalMode && (
+        <EditMarginModal
+          isOpen={marginModalMode !== null}
+          onClose={handleCloseMarginModal}
+          position={position}
+          account={account}
+          currentPrice={currentPrice}
+          mode={marginModalMode}
+        />
+      )}
+
+      {/* Reverse position modal (from Modify menu) */}
+      {position && isReverseModalOpen && (
+        <ReversePositionModal
+          isOpen={isReverseModalOpen}
+          onClose={handleCloseReverseModal}
+          position={position}
+          currentPrice={currentPrice}
+          sizeDecimals={marketInfo?.szDecimals}
+        />
+      )}
+
+      {/* TP/SL update modal (from Auto Close row) */}
+      {position && isTPSLModalOpen && (
+        <UpdateTPSLModal
+          key={position.symbol}
+          isOpen={isTPSLModalOpen}
+          onClose={handleCloseTPSLModal}
+          position={position}
+          currentPrice={currentPrice}
+        />
+      )}
+
+      {/* Close position modal */}
+      {position && isCloseModalOpen && (
+        <ClosePositionModal
+          isOpen={isCloseModalOpen}
+          onClose={() => setIsCloseModalOpen(false)}
+          position={position}
+          currentPrice={currentPrice}
+          sizeDecimals={marketInfo?.szDecimals}
+        />
+      )}
+
+      {/* Cancel order modal */}
+      {cancelOrderTarget && (
+        <CancelOrderModal
+          isOpen={cancelOrderTarget !== null}
+          onClose={() => setCancelOrderTarget(null)}
+          order={cancelOrderTarget}
+        />
+      )}
+
+      {/* Tutorial modal — opened via "Learn the basics of perps" */}
+      <PerpsTutorialModal />
+
+      <PerpsGeoBlockModal
+        isOpen={isGeoBlockModalOpen}
+        onClose={() => setIsGeoBlockModalOpen(false)}
+      />
     </Box>
   );
 };
