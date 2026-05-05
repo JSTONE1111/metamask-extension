@@ -65,7 +65,7 @@ export type FeatureFlagRegistryEntry = {
  * Remote flag values are stored in the exact format returned by the production
  * client-config API, so they can be served directly by mock-e2e.js.
  *
- * Production defaults last synced: 2026-04-14
+ * Production defaults last synced: 2026-05-05
  * Source: https://client-config.api.cx.metamask.io/v1/flags?client=extension&distribution=main&environment=prod
  */
 export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
@@ -940,7 +940,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      useBackendWebSocketService: true,
+      pollingIntervalMs: 86400000,
     },
     status: FeatureFlagStatus.Active,
   },
@@ -1918,67 +1918,67 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      '0xa86a': {
-        extensionActive: false,
-        sentinelUrl: 'https://tx-sentinel-avalanche-mainnet.api.cx.metamask.io',
-      },
-      '0x2105': {
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: true,
-        sentinelUrl: 'https://tx-sentinel-base-mainnet.api.cx.metamask.io',
-      },
-      '0xe708': {
-        sentinelUrl: 'https://tx-sentinel-linea-mainnet.api.cx.metamask.io',
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: false,
-      },
-      '0x89': {
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: true,
-        sentinelUrl: 'https://tx-sentinel-polygon-mainnet.api.cx.metamask.io',
-      },
-      '0x1': {
-        maxDeadline: 160,
-        sentinelUrl: 'https://tx-sentinel-ethereum-mainnet.api.cx.metamask.io',
-        expectedDeadline: 45,
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: false,
-      },
-      '0xa4b1': {
-        gaslessBridgeWith7702Enabled: true,
-        sentinelUrl: 'https://tx-sentinel-arbitrum-mainnet.api.cx.metamask.io',
-        extensionActive: true,
-      },
       default: {
-        maxDeadline: 150,
-        batchStatusPollingInterval: 1000,
-        expectedDeadline: 45,
         extensionActive: false,
         extensionReturnTxHashAsap: true,
         extensionReturnTxHashAsapBatch: true,
         extensionSkipSmartTransactionStatusPage: false,
+        gaslessBridgeWith7702Enabled: false,
+        maxDeadline: 150,
+        batchStatusPollingInterval: 1000,
+        expectedDeadline: 45,
+      },
+      '0x38': {
+        sentinelUrl: 'https://tx-sentinel-bsc-mainnet.api.cx.metamask.io',
+        extensionActive: true,
         gaslessBridgeWith7702Enabled: false,
       },
       '0x531': {
         sentinelUrl: 'https://tx-sentinel-sei-mainnet.api.cx.metamask.io',
         extensionActive: false,
       },
-      '0x144': {
-        sentinelUrl: 'https://tx-sentinel-zksync-mainnet.api.cx.metamask.io',
-        extensionActive: false,
+      '0xe708': {
+        extensionActive: true,
+        gaslessBridgeWith7702Enabled: true,
+        sentinelUrl: 'https://tx-sentinel-linea-mainnet.api.cx.metamask.io',
       },
-      '0xa': {
-        extensionActive: false,
-        sentinelUrl: 'https://tx-sentinel-optimism-mainnet.api.cx.metamask.io',
-      },
-      '0x38': {
+      '0x1': {
+        sentinelUrl: 'https://tx-sentinel-ethereum-mainnet.api.cx.metamask.io',
+        expectedDeadline: 45,
         extensionActive: true,
         gaslessBridgeWith7702Enabled: false,
-        sentinelUrl: 'https://tx-sentinel-bsc-mainnet.api.cx.metamask.io',
+        maxDeadline: 160,
+      },
+      '0xa4b1': {
+        sentinelUrl: 'https://tx-sentinel-arbitrum-mainnet.api.cx.metamask.io',
+        extensionActive: true,
+        gaslessBridgeWith7702Enabled: true,
+      },
+      '0x89': {
+        gaslessBridgeWith7702Enabled: true,
+        sentinelUrl: 'https://tx-sentinel-polygon-mainnet.api.cx.metamask.io',
+        extensionActive: true,
+      },
+      '0x144': {
+        extensionActive: false,
+        sentinelUrl: 'https://tx-sentinel-zksync-mainnet.api.cx.metamask.io',
+      },
+      '0x2105': {
+        extensionActive: true,
+        gaslessBridgeWith7702Enabled: true,
+        sentinelUrl: 'https://tx-sentinel-base-mainnet.api.cx.metamask.io',
+      },
+      '0xa': {
+        sentinelUrl: 'https://tx-sentinel-optimism-mainnet.api.cx.metamask.io',
+        extensionActive: false,
+      },
+      '0xa86a': {
+        extensionActive: false,
+        sentinelUrl: 'https://tx-sentinel-avalanche-mainnet.api.cx.metamask.io',
       },
       '0x8f': {
-        extensionActive: false,
         sentinelUrl: 'https://tx-sentinel-monad-mainnet.api.cx.metamask.io',
+        extensionActive: false,
       },
     },
     status: FeatureFlagStatus.Active,
@@ -2186,7 +2186,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     inProd: true,
     productionDefault: {
       enabled: false,
-      minimumVersion: '13.15.0',
+      minimumVersion: '13.30.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2195,7 +2195,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     name: 'perpsHip3AllowlistMarkets',
     type: FeatureFlagType.Remote,
     inProd: true,
-    productionDefault: 'xyz:*',
+    productionDefault: '',
     status: FeatureFlagStatus.Active,
   },
   rewardsBitcoinEnabledExtension: {
@@ -2311,7 +2311,77 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      name: 'empty',
+      relayQuoteUrl: 'https://intents.api.cx.metamask.io/relay/quote',
+      attemptsMax: 4,
+      bufferSubsequent: 0.05,
+      slippageTokens: {
+        '0x2105': {
+          '0x4200000000000000000000000000000000000006': 0.005,
+          '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913': 0.005,
+          '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+        },
+        '0x38': {
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c': 0.005,
+          '0x2170Ed0880ac9A755fd29B2688956BD959F933F8': 0.005,
+          '0x55d398326f99059fF775485246999027B3197955': 0.005,
+          '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d': 0.005,
+        },
+        '0x89': {
+          '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619': 0.005,
+          '0xc2132D05D31c914a87C6611C10748AEb04B58e8F': 0.005,
+          '0x0000000000000000000000000000000000001010': 0.005,
+          '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174': 0.005,
+          '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359': 0.005,
+        },
+        '0xa4b1': {
+          '0xaf88d065e77c8cC2239327C5EDb3A432268e5831': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1': 0.005,
+          '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9': 0.005,
+        },
+        '0xe708': {
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x176211869cA2b568f2A7D4EE941E073a821EE1ff': 0.005,
+          '0xA219439258ca9da29E9Cc4cE5596924745e12B93': 0.005,
+          '0xacA92E438df0B2401fF60dA7E4337B687a2435DA': 0.005,
+          '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f': 0.005,
+        },
+        '0x1': {
+          '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2': 0.005,
+          '0xacA92E438df0B2401fF60dA7E4337B687a2435DA': 0.005,
+          '0xdAC17F958D2ee523a2206206994597C13D831ec7': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599': 0.005,
+          '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48': 0.005,
+        },
+      },
+      slippage: 0.02,
+      relayDisabledGasStationChains: [],
+      bufferInitial: 0.015,
+      allowedPredictWithdrawTokens: {
+        '0x89': [
+          '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+          '0x0000000000000000000000000000000000000000',
+          '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+        ],
+        '0x1': [
+          '0x0000000000000000000000000000000000000000',
+          '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+        ],
+        '0x38': [
+          '0x0000000000000000000000000000000000000000',
+          '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+        ],
+      },
+      perpsWithdrawAnyToken: false,
+      predictWithdrawAnyToken: true,
+      bufferStep: 0.015,
+      relayFallbackGas: {
+        estimate: '900001',
+        max: '1500001',
+      },
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2365,8 +2435,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      minimumVersion: '13.26.0',
       enabled: true,
+      minimumVersion: '13.27.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2435,7 +2505,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      blockedRegions: ['BE', 'US', 'CA-ON', 'GB'],
+      blockedRegions: ['BE', 'US', 'CA-ON', 'GB', 'CU', 'IR', 'KP', 'SY'],
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2472,7 +2542,114 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     name: 'perpsHip3BlocklistMarkets',
     type: FeatureFlagType.Remote,
     inProd: true,
-    productionDefault: 'variation 2',
+    productionDefault: '',
+    status: FeatureFlagStatus.Active,
+  },
+  extensionTransactionLabels: {
+    name: 'extensionTransactionLabels',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: false,
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationBatchStatus: {
+    name: 'stxMigrationBatchStatus',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'sentinel on',
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+        value: true,
+      },
+      {
+        name: 'sentinel off',
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+        value: false,
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationCancel: {
+    name: 'stxMigrationCancel',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'sentinel on',
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+        value: true,
+      },
+      {
+        value: false,
+        name: 'sentinel off',
+        scope: {
+          value: 1,
+          type: 'threshold',
+        },
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationGetFees: {
+    name: 'stxMigrationGetFees',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'sentinel on',
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+        value: true,
+      },
+      {
+        value: false,
+        name: 'sentinel off',
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationSubmitTransactions: {
+    name: 'stxMigrationSubmitTransactions',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'sentinel on',
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+        value: true,
+      },
+      {
+        value: false,
+        name: 'sentinel off',
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+      },
+    ],
     status: FeatureFlagStatus.Active,
   },
 };
