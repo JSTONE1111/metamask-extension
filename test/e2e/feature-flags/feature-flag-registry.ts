@@ -65,7 +65,7 @@ export type FeatureFlagRegistryEntry = {
  * Remote flag values are stored in the exact format returned by the production
  * client-config API, so they can be served directly by mock-e2e.js.
  *
- * Production defaults last synced: 2026-04-14
+ * Production defaults last synced: 2026-07-21
  * Source: https://client-config.api.cx.metamask.io/v1/flags?client=extension&distribution=main&environment=prod
  */
 export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
@@ -174,7 +174,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     name: 'additionalNetworksBlacklist',
     type: FeatureFlagType.Remote,
     inProd: true,
-    productionDefault: [],
+    productionDefault: ['0x1079', '0x13b2'],
     status: FeatureFlagStatus.Active,
   },
 
@@ -235,10 +235,17 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     inProd: true,
     productionDefault: {
       versions: {
+        '13.37.0': {
+          minimumVersion: '13.38.0',
+          deprecatedControllers: ['TokenListController'],
+          enabled: true,
+          featureVersion: '1',
+        },
         '13.15.0': {
+          deprecatedControllers: [],
+          enabled: false,
           featureVersion: null,
           minimumVersion: null,
-          enabled: false,
         },
       },
     },
@@ -263,14 +270,12 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
+      sse: {
+        enabled: true,
+        minimumVersion: '13.9.0',
+      },
+      minimumVersion: '0.0.0',
       bip44DefaultPairs: {
-        bip122: {
-          standard: {
-            'bip122:000000000019d6689c085ae165831e93/slip44:0':
-              'eip155:1/slip44:60',
-          },
-          other: {},
-        },
         eip155: {
           other: {},
           standard: {
@@ -279,29 +284,39 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           },
         },
         solana: {
-          other: {},
           standard: {
             'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/slip44:501':
               'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
           },
+          other: {},
+        },
+        bip122: {
+          other: {},
+          standard: {
+            'bip122:000000000019d6689c085ae165831e93/slip44:0':
+              'eip155:1/slip44:60',
+          },
         },
       },
+      refreshRate: 30000,
+      maxRefreshCount: 5,
       priceImpactThreshold: {
         gasless: 0.2,
         normal: 0.05,
       },
+      support: true,
       chains: {
         '1': {
+          stablecoins: [
+            '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+            '0xdac17f958d2ee523a2206206994597c13d831ec7',
+          ],
           topAssets: ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           isActiveDest: true,
           isActiveSrc: true,
           isGaslessSwapEnabled: true,
           isSingleSwapBridgeButtonEnabled: true,
           noFeeAssets: [],
-          stablecoins: [
-            '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
-            '0xdac17f958d2ee523a2206206994597c13d831ec7',
-          ],
         },
         '10': {
           stablecoins: [
@@ -314,7 +329,6 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           isSingleSwapBridgeButtonEnabled: true,
         },
         '56': {
-          isSingleSwapBridgeButtonEnabled: true,
           stablecoins: [
             '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d',
             '0x55d398326f99059ff775485246999027b3197955',
@@ -322,8 +336,10 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           isActiveDest: true,
           isActiveSrc: true,
           isGaslessSwapEnabled: true,
+          isSingleSwapBridgeButtonEnabled: true,
         },
         '137': {
+          isActiveDest: true,
           isActiveSrc: true,
           isSingleSwapBridgeButtonEnabled: true,
           stablecoins: [
@@ -331,12 +347,11 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             '0x2791bca1f2de4661ed88a30c99a7a9449aa84174',
             '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
           ],
-          isActiveDest: true,
         },
         '143': {
+          isSingleSwapBridgeButtonEnabled: true,
           isActiveDest: true,
           isActiveSrc: true,
-          isSingleSwapBridgeButtonEnabled: true,
         },
         '324': {
           isActiveSrc: true,
@@ -349,16 +364,16 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           isActiveDest: true,
         },
         '999': {
-          stablecoins: ['0xb88339CB7199b77E23DB6E890353E22632Ba630f'],
           isActiveDest: true,
           isActiveSrc: true,
           isSingleSwapBridgeButtonEnabled: true,
+          stablecoins: ['0xb88339CB7199b77E23DB6E890353E22632Ba630f'],
         },
         '1329': {
-          stablecoins: ['0x3894085Ef7Ff0f0aeDf52E2A2704928d1Ec074F1'],
           isActiveDest: true,
           isActiveSrc: true,
           isSingleSwapBridgeButtonEnabled: true,
+          stablecoins: ['0x3894085Ef7Ff0f0aeDf52E2A2704928d1Ec074F1'],
         },
         '4326': {
           isSingleSwapBridgeButtonEnabled: true,
@@ -366,14 +381,24 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           isActiveDest: true,
           isActiveSrc: true,
         },
-        '8453': {
-          stablecoins: ['0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'],
+        '4663': {
+          isActiveSrc: true,
+          isSingleSwapBridgeButtonEnabled: true,
+          topAssets: [
+            '0x5d3a1Ff2b6BAb83b63cd9AD0787074081a52ef34',
+            '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
+          ],
           isActiveDest: true,
+        },
+        '8453': {
           isActiveSrc: true,
           isGaslessSwapEnabled: true,
           isSingleSwapBridgeButtonEnabled: true,
+          stablecoins: ['0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'],
+          isActiveDest: true,
         },
         '42161': {
+          isActiveSrc: true,
           isSingleSwapBridgeButtonEnabled: true,
           stablecoins: [
             '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
@@ -381,7 +406,6 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
           ],
           isActiveDest: true,
-          isActiveSrc: true,
         },
         '43114': {
           stablecoins: [
@@ -395,6 +419,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           isSingleSwapBridgeButtonEnabled: true,
         },
         '59144': {
+          isSingleSwapBridgeButtonEnabled: true,
+          noFeeAssets: [],
           stablecoins: [
             '0x176211869cA2b568f2A7D4EE941E073a821EE1ff',
             '0xA219439258ca9da29E9Cc4cE5596924745e12B93',
@@ -403,15 +429,22 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           isActiveDest: true,
           isActiveSrc: true,
           isGaslessSwapEnabled: true,
-          isSingleSwapBridgeButtonEnabled: true,
-          noFeeAssets: [],
         },
         '728126428': {
-          isActiveDest: true,
           isActiveSrc: true,
           isSingleSwapBridgeButtonEnabled: true,
+          isActiveDest: true,
+        },
+        '20000000000001': {
+          isActiveSrc: true,
+          isSingleSwapBridgeButtonEnabled: true,
+          isActiveDest: true,
         },
         '1151111081099710': {
+          isActiveSrc: true,
+          isSingleSwapBridgeButtonEnabled: true,
+          isSnapConfirmationEnabled: true,
+          refreshRate: 10000,
           topAssets: [
             'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
             '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN',
@@ -425,22 +458,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             'pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn',
           ],
           isActiveDest: true,
-          isActiveSrc: true,
-          isSingleSwapBridgeButtonEnabled: true,
-          isSnapConfirmationEnabled: true,
-          refreshRate: 10000,
-        },
-        '20000000000001': {
-          isActiveSrc: true,
-          isSingleSwapBridgeButtonEnabled: true,
-          isActiveDest: true,
         },
       },
-      sse: {
-        enabled: true,
-        minimumVersion: '13.9.0',
-      },
-      support: true,
       stablecoins: [
         'eip155:1/erc20:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
         'eip155:1/erc20:0xdac17f958d2ee523a2206206994597c13d831ec7',
@@ -468,6 +487,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
         'eip155:1329/erc20:0x3894085ef7ff0f0aedf52e2a2704928d1ec074f1',
         'eip155:4326/erc20:0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb',
         'eip155:999/erc20:0xb88339cb7199b77e23db6e890353e22632ba630f',
+        'eip155:4663/erc20:0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34',
+        'eip155:4663/erc20:0x5fc5360d0400a0fd4f2af552add042d716f1d168',
       ],
       chainRanking: [
         {
@@ -475,40 +496,44 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           name: 'Ethereum',
         },
         {
-          name: 'BNB Chain',
           chainId: 'eip155:56',
+          name: 'BNB Chain',
+        },
+        {
+          chainId: 'eip155:4663',
+          name: 'Robinhood',
         },
         {
           chainId: 'bip122:000000000019d6689c085ae165831e93',
           name: 'BTC',
         },
         {
-          name: 'Solana',
           chainId: 'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
+          name: 'Solana',
         },
         {
-          name: 'Tron',
           chainId: 'tron:728126428',
+          name: 'Tron',
         },
         {
-          name: 'Base',
           chainId: 'eip155:8453',
+          name: 'Base',
         },
         {
-          name: 'Arbitrum',
           chainId: 'eip155:42161',
+          name: 'Arbitrum',
         },
         {
-          chainId: 'eip155:59144',
           name: 'Linea',
+          chainId: 'eip155:59144',
         },
         {
           chainId: 'eip155:137',
           name: 'Polygon',
         },
         {
-          name: 'Avalanche',
           chainId: 'eip155:43114',
+          name: 'Avalanche',
         },
         {
           chainId: 'eip155:10',
@@ -519,8 +544,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           name: 'Monad',
         },
         {
-          chainId: 'eip155:1329',
           name: 'Sei',
+          chainId: 'eip155:1329',
         },
         {
           chainId: 'eip155:4326',
@@ -531,13 +556,10 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           name: 'HyperEVM',
         },
         {
-          chainId: 'eip155:324',
           name: 'zkSync Era',
+          chainId: 'eip155:324',
         },
       ],
-      maxRefreshCount: 5,
-      refreshRate: 30000,
-      minimumVersion: '0.0.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -593,6 +615,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
         '0x27d8',
         '0x38',
         '0x3909',
+        '0x483',
         '0x515',
         '0x530',
         '0x531',
@@ -608,19 +631,50 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
         '0xa4b1',
         '0xa4ba',
         '0xa4ec',
-        '0xa5bf',
         '0xaa044c',
         '0xaa36a7',
         '0xaa37dc',
         '0xe708',
       ],
       contracts: {
-        '0x82': [
+        '0x61': [
           {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Unichain Mainnet',
+            name: 'BNB Testnet',
             signature:
-              '0x54c423b1af4abbd1fb226e260dddba757acbcd8881e6b55b842c6b839874fa3f0e2f77685389ad5c28e096f12ef22557cebf6a77f6064baa071453a445a4c7d51c',
+              '0x80aaf42c70b0b9efdf26e38ced69fce70f6b4f5496e7e59888819c14fb16290301ad049299d99e3650fa1a616a87bb80eb52ae9f02ddd8b53dd6b983275d0eb61b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x1': [
+          {
+            name: 'Mainnet',
+            signature:
+              '0xffb37facfedf12f1e98b56203de1c855391b791a20ee361234c546f4b50eb11853283cfc311419049f0325ad0a806ec232cc519073e3b5d4ad59ff331964d2e71b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0xa': [
+          {
+            name: 'Optimism',
+            signature:
+              '0x60e12ffc04e098bd26a897ed2a974e4e255fc6db3b052fe3a2647372bfbac76f096bf5236510ddc217e12b802e08617cc27292d69ca51b0467ba91c6df74cd7b1c',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x531': [
+          {
+            signature:
+              '0xde089fc9af662bc4b0f873e4dc79760f6c3539f6f1cf32d9bc46baccf86ebae070a9062436f29ee86d04cc55699b27579f657922a2292ec2f1c5170d587917401b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Sei Mainnet',
+          },
+        ],
+        '0x13fb': [
+          {
+            signature:
+              '0xf9e4aa35fc098468212352c2b9662022f9565bd713ca66e634c804f9820b5e0c266d710afba58aed00e5b7e24134dd9b52e2e331076de745137531a6d245a7521b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Citrea Testnet',
           },
         ],
         '0x1012': [
@@ -631,212 +685,44 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
           },
         ],
-        '0xa4ba': [
+        '0x2105': [
           {
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Base',
+            signature:
+              '0xbdddd2e925cf2cc7e148d3c11b02c917995fba8f3a3dc0b73c0059d029feca88014e723b8a32b2310a60c5b1cc17dfb3ae180b5a39f1d3264f985314b9168e0a1c',
+          },
+        ],
+        '0xa4ba': [
+          {
             name: 'Arbitrum Nova',
             signature:
               '0x818898e7f90f2f1f47dc7bec74dd683dfcc11efc7025d81f57644d366a3d9e442edb789731045ccb5ba89ee0d84bb517194bb9a097b152922bbd39ffd022ff421c',
-          },
-        ],
-        '0x3909': [
-          {
-            name: 'Sonic Testnet',
-            signature:
-              '0xc092cc0bcf804f95eb659d281c00586bc72018a242d66fefacdc33a990faf99478c368612277cbbf72aee4a10b7ace6d8666f2c8c4fece9daada40cb360190631b',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0x38': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'BNB',
-            signature:
-              '0x28ae371904b3ba71344e426c8de0e2cee0b8529a9510c059b412671655881ad646b8cf544342a5f8e0753eda83221e14e3c9dae5435417401f5fee8ee1d63dce1b',
-          },
-        ],
-        '0x138c5': [
-          {
-            name: 'Berachain Testnet',
-            signature:
-              '0x66940bcb2c4b95ec2c1c1024fee1e3a8e51c8f072a52a9f0252a793604c8a6ba58ac3153d4dd041873d33eec349450c4a9acd51ddaed117bee448ed7a388208c1b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0x1079': [
-          {
-            name: 'Tempo',
-            signature:
-              '0x810496170fb570d0d976c58273ad4a423252bac1f2e10c8a63adbbbfc4e79d2c5d894bae20c28e90a577338e68506138ac6dea142a1e80a31c0c2dd2999efa651b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0x89': [
-          {
-            name: 'Polygon',
-            signature:
-              '0x302aa2d59940e88f35d2fa140fe6a1e9dc682218a444a7fb2d88f007fbe7792b2b8d615f5ae1e4f184533a02c47d8ac0f6ba3f591679295dff93c65095c0f03d1b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0xa': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Optimism',
-            signature:
-              '0x60e12ffc04e098bd26a897ed2a974e4e255fc6db3b052fe3a2647372bfbac76f096bf5236510ddc217e12b802e08617cc27292d69ca51b0467ba91c6df74cd7b1c',
-          },
-        ],
-        '0x531': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Sei Mainnet',
-            signature:
-              '0xde089fc9af662bc4b0f873e4dc79760f6c3539f6f1cf32d9bc46baccf86ebae070a9062436f29ee86d04cc55699b27579f657922a2292ec2f1c5170d587917401b',
-          },
-        ],
-        '0x14a34': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Base Sepolia',
-            signature:
-              '0xaed94ac035e745629423c547200eb2411fd7194d832a6b4cf459d3e3d34a6b62124e88640a0bf623146bdef63b0ce1c8797bd2a6c8357fab86c8be466744f55d1c',
-          },
-        ],
-        '0x13fb': [
-          {
-            name: 'Citrea Testnet',
-            signature:
-              '0xf9e4aa35fc098468212352c2b9662022f9565bd713ca66e634c804f9820b5e0c266d710afba58aed00e5b7e24134dd9b52e2e331076de745137531a6d245a7521b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0x138de': [
-          {
-            signature:
-              '0x2c2037ddedcdfb9b7d8ea7c546259eef371a86b0e3610192eb15ece0114c59d86134791cd9e9df4208bbbdc83776d80b30b1fea6bf1a05bb072575217492497a1b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Berachain',
-          },
-        ],
-        '0x8f': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Monad',
-            signature:
-              '0x12d31e58c92cdc29dac8af0405883b3b0ee44156d7fdf5c3c2ffa4138f2461cc20e7f8625431dbd24bb784407d1a1d9bdb75b191a6cf127eac68b67d13bd11e41c',
-          },
-        ],
-        '0x18c6': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'MegaEth Testnet',
-            signature:
-              '0x6743135a8dfc8f58133d827b4997bc5316c8eb92883d2704a30b1d8a7bf494ce226b523e5f85a681eb5de8349c9564e62d389876d0e5fe5cc06fb9412d9d1cb61b',
-          },
-        ],
-        '0x88bb0': [
-          {
-            signature:
-              '0x23de8eb645a65b08721e5d2194063acead5f5f818474b7884ae767c7aaf9bb9b22233ab92684bc41087f8509e945d96083124ae1919a9357f2ae65267df4f0e21b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Hoodi Testnet',
-          },
-        ],
-        '0xa4b1': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Arbitrum One',
-            signature:
-              '0xc3be82057efec197d92b0cbb7cef9d50dba0345646524687a3ae7235a8fcb1706ba79f197d45fcf4c6cfb5808ef70258c5f6bb29b7e3553a4b9660692eb5e81d1b',
-          },
-        ],
-        '0x1': [
-          {
-            signature:
-              '0xffb37facfedf12f1e98b56203de1c855391b791a20ee361234c546f4b50eb11853283cfc311419049f0325ad0a806ec232cc519073e3b5d4ad59ff331964d2e71b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Mainnet',
-          },
-        ],
-        '0x279f': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Monad Testnet',
-            signature:
-              '0x85ec60e9dbac6404b66803b5abace8517ce1325bb6391b7d1ff8ec4433bbe62f4363031873a11ed79364290e196a47830fc36346a9aaf2e44518c1101496983c1b',
-          },
-        ],
-        '0x19': [
-          {
-            signature:
-              '0xa1856ef8c948b0a5204da687d53231848de2a585def9faac05c23c47412615dc476db943010164356b1d2ca8a8a66a8b0ae2d30c11b6b2aaf1cca116f0a333761c',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Cronos',
           },
         ],
         '0xaa37dc': [
           {
-            signature:
-              '0xa60cab833af6a8aa2dcc80d5e12d9e1566edb6cdf51c38e7cf43d441dac561007f05643e73e6b00107e18dbf15de98aae14192306276e92d654f62bd7c3023241c',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
             name: 'Optimism Sepolia',
+            signature:
+              '0xa60cab833af6a8aa2dcc80d5e12d9e1566edb6cdf51c38e7cf43d441dac561007f05643e73e6b00107e18dbf15de98aae14192306276e92d654f62bd7c3023241c',
           },
         ],
-        '0x515': [
+        '0xaa044c': [
           {
-            name: 'Unichain Sepolia',
-            signature:
-              '0x64487330691a05700a2321ee1db4092adce9590e7aded6e489df024838ecec734c935d182f74883818cb7659d5c784163573afdf8221252fa68d960cbe1c312f1b',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Celo Sepolia',
+            signature:
+              '0x1590458cdfa10225e4fe734ed44deec95ac1887c877e63deb5ad35b41025c9ef2f33666cdd2c189b1999a78072ab9f8f122d93a52eaf12687fb2ff5b74d8de9f1c',
           },
         ],
-        '0x92': [
+        '0x530': [
           {
-            name: 'Sonic Mainnet',
+            name: 'Sei Testnet',
             signature:
-              '0x9f2a94332f2b71bff8a772053f47dbb65e26e5286341be0a3c55270d5549351f1dddb7566be0619b0150d42d540b0847cb0acbd0ab118ff608a40a18400834711b',
+              '0x91135fcd7bfb9e2456c227ff12905128c3854db36775278d47b96c3c669f730c4063e3a62d94884617769bbad2868f35d725cb3b611d9bd1231bceb5967724711c',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0x64': [
-          {
-            signature:
-              '0xd0cfc2959c866e5218faf675f852e0c7021a454064e509d40256c5bec395e300381c19dcbec2e921b2f6d7d9a925a39dee8ea2e8dd8f595633b8dc333d91f1af1b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Gnosis',
-          },
-        ],
-        '0xe708': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Linea',
-            signature:
-              '0x8bad472a54f1be8adbcce8badc512045a467d64aa2affce55eb6ecb9b6eda8a142eee478bc99a81580ff52d5daea857eb9e482e457b1e121c0574191e01ec9f21c',
-          },
-        ],
-        '0x61': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'BNB Testnet',
-            signature:
-              '0x80aaf42c70b0b9efdf26e38ced69fce70f6b4f5496e7e59888819c14fb16290301ad049299d99e3650fa1a616a87bb80eb52ae9f02ddd8b53dd6b983275d0eb61b',
-          },
-        ],
-        '0x66eee': [
-          {
-            name: 'Arbitrum Sepolia',
-            signature:
-              '0x6fdb53ecf8f575b85ff9895277b1f8e11349970fbb42225fe41587a072bbcef43e8d54303c4e1aa38d44cae9ba2c8bf825e9e138176d6b09a729cd82a14356cf1b',
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-          },
-        ],
-        '0x152': [
-          {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Cronos Testnet',
-            signature:
-              '0x8fec0190a311f6ba5dc9df8d76fef3673e6c4081c087f779bca7e3247bb40a5070d393d29c6b268deb3fa231a138b7914b25395cd6dec0fdf4b2b7701975e78b1c',
           },
         ],
         '0xaa36a7': [
@@ -853,28 +739,116 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
               '0x016cf109489c415ba28e695eb3cb06ac46689c5c49e2aba101d7ec2f68c890282563b324f5c8df5e0536994451825aa235438b7346e8c18b4e64161d990781891c',
           },
         ],
-        '0x2105': [
+        '0x27d8': [
           {
-            signature:
-              '0xbdddd2e925cf2cc7e148d3c11b02c917995fba8f3a3dc0b73c0059d029feca88014e723b8a32b2310a60c5b1cc17dfb3ae180b5a39f1d3264f985314b9168e0a1c',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Base',
+            name: 'Chiado',
+            signature:
+              '0x0ff531d6afcc191c3b3bdffc1596d9ce8d1d52fa500ea2097c0823820a66f97963b88b646d4d4edbc0f781127d7985b87132d89c62c3cb4ad42848ce289645fa1b',
           },
         ],
-        '0xa5bf': [
+        '0x279f': [
           {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Tempo Testnet',
+            name: 'Monad Testnet',
             signature:
-              '0x2413338e5c47c56853195d1870988d721ec502c78e54fe5b98468a401538b942237a2769461ffbfa8269936bf309243d5b0d69f7114938653469c4d8225715ee1c',
+              '0x85ec60e9dbac6404b66803b5abace8517ce1325bb6391b7d1ff8ec4433bbe62f4363031873a11ed79364290e196a47830fc36346a9aaf2e44518c1101496983c1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
           },
         ],
-        '0xaa044c': [
+        '0x14a34': [
           {
-            name: 'Celo Sepolia',
             signature:
-              '0x1590458cdfa10225e4fe734ed44deec95ac1887c877e63deb5ad35b41025c9ef2f33666cdd2c189b1999a78072ab9f8f122d93a52eaf12687fb2ff5b74d8de9f1c',
+              '0xaed94ac035e745629423c547200eb2411fd7194d832a6b4cf459d3e3d34a6b62124e88640a0bf623146bdef63b0ce1c8797bd2a6c8357fab86c8be466744f55d1c',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Base Sepolia',
+          },
+        ],
+        '0xa4ec': [
+          {
+            signature:
+              '0x1421ea4d014170a4fc5d0559f267974f4aa095a6e6047b107eff1807afa425774775f796a52a90b767810eade3b5919087bb361651a7b8f4f9679f1f46adb60e1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Celo Mainnet',
+          },
+        ],
+        '0xe708': [
+          {
+            name: 'Linea',
+            signature:
+              '0x8bad472a54f1be8adbcce8badc512045a467d64aa2affce55eb6ecb9b6eda8a142eee478bc99a81580ff52d5daea857eb9e482e457b1e121c0574191e01ec9f21c',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0xa4b1': [
+          {
+            name: 'Arbitrum One',
+            signature:
+              '0xc3be82057efec197d92b0cbb7cef9d50dba0345646524687a3ae7235a8fcb1706ba79f197d45fcf4c6cfb5808ef70258c5f6bb29b7e3553a4b9660692eb5e81d1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x82': [
+          {
+            name: 'Unichain Mainnet',
+            signature:
+              '0x54c423b1af4abbd1fb226e260dddba757acbcd8881e6b55b842c6b839874fa3f0e2f77685389ad5c28e096f12ef22557cebf6a77f6064baa071453a445a4c7d51c',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x89': [
+          {
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Polygon',
+            signature:
+              '0x302aa2d59940e88f35d2fa140fe6a1e9dc682218a444a7fb2d88f007fbe7792b2b8d615f5ae1e4f184533a02c47d8ac0f6ba3f591679295dff93c65095c0f03d1b',
+          },
+        ],
+        '0x138de': [
+          {
+            signature:
+              '0x2c2037ddedcdfb9b7d8ea7c546259eef371a86b0e3610192eb15ece0114c59d86134791cd9e9df4208bbbdc83776d80b30b1fea6bf1a05bb072575217492497a1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Berachain',
+          },
+        ],
+        '0x66eee': [
+          {
+            signature:
+              '0x6fdb53ecf8f575b85ff9895277b1f8e11349970fbb42225fe41587a072bbcef43e8d54303c4e1aa38d44cae9ba2c8bf825e9e138176d6b09a729cd82a14356cf1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Arbitrum Sepolia',
+          },
+        ],
+        '0x3909': [
+          {
+            name: 'Sonic Testnet',
+            signature:
+              '0xc092cc0bcf804f95eb659d281c00586bc72018a242d66fefacdc33a990faf99478c368612277cbbf72aee4a10b7ace6d8666f2c8c4fece9daada40cb360190631b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x483': [
+          {
+            name: 'Intuition Mainnet',
+            signature:
+              '0x0bb2e5471222492f516a6f1d92fd2b592645bf4124db1b53a6e1b2c505da9c3877fbbdc03642dc8be4ffdfb84a880662dde7b9be394114271b7dd1c217dca9ed1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x19': [
+          {
+            name: 'Cronos',
+            signature:
+              '0xa1856ef8c948b0a5204da687d53231848de2a585def9faac05c23c47412615dc476db943010164356b1d2ca8a8a66a8b0ae2d30c11b6b2aaf1cca116f0a333761c',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+          },
+        ],
+        '0x515': [
+          {
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Unichain Sepolia',
+            signature:
+              '0x64487330691a05700a2321ee1db4092adce9590e7aded6e489df024838ecec734c935d182f74883818cb7659d5c784163573afdf8221252fa68d960cbe1c312f1b',
           },
         ],
         '0x13882': [
@@ -885,27 +859,75 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
               '0x472bb78ebb6686ddf0bb2e75265e1f4266cd050f8b498e88f97e9380afd8bfbd169c4d3221ec8845cb81ba7e9ddb7de9b819a15617803e20aee2aaa07664b6c81b',
           },
         ],
-        '0x27d8': [
+        '0x64': [
           {
-            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
-            name: 'Chiado',
             signature:
-              '0x0ff531d6afcc191c3b3bdffc1596d9ce8d1d52fa500ea2097c0823820a66f97963b88b646d4d4edbc0f781127d7985b87132d89c62c3cb4ad42848ce289645fa1b',
+              '0xd0cfc2959c866e5218faf675f852e0c7021a454064e509d40256c5bec395e300381c19dcbec2e921b2f6d7d9a925a39dee8ea2e8dd8f595633b8dc333d91f1af1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Gnosis',
           },
         ],
-        '0xa4ec': [
+        '0x138c5': [
           {
-            name: 'Celo Mainnet',
             signature:
-              '0x1421ea4d014170a4fc5d0559f267974f4aa095a6e6047b107eff1807afa425774775f796a52a90b767810eade3b5919087bb361651a7b8f4f9679f1f46adb60e1b',
+              '0x66940bcb2c4b95ec2c1c1024fee1e3a8e51c8f072a52a9f0252a793604c8a6ba58ac3153d4dd041873d33eec349450c4a9acd51ddaed117bee448ed7a388208c1b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Berachain Testnet',
+          },
+        ],
+        '0x8f': [
+          {
+            signature:
+              '0x12d31e58c92cdc29dac8af0405883b3b0ee44156d7fdf5c3c2ffa4138f2461cc20e7f8625431dbd24bb784407d1a1d9bdb75b191a6cf127eac68b67d13bd11e41c',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Monad',
+          },
+        ],
+        '0x152': [
+          {
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Cronos Testnet',
+            signature:
+              '0x8fec0190a311f6ba5dc9df8d76fef3673e6c4081c087f779bca7e3247bb40a5070d393d29c6b268deb3fa231a138b7914b25395cd6dec0fdf4b2b7701975e78b1c',
+          },
+        ],
+        '0x88bb0': [
+          {
+            signature:
+              '0x23de8eb645a65b08721e5d2194063acead5f5f818474b7884ae767c7aaf9bb9b22233ab92684bc41087f8509e945d96083124ae1919a9357f2ae65267df4f0e21b',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Hoodi Testnet',
+          },
+        ],
+        '0x18c6': [
+          {
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'MegaEth Testnet',
+            signature:
+              '0x6743135a8dfc8f58133d827b4997bc5316c8eb92883d2704a30b1d8a7bf494ce226b523e5f85a681eb5de8349c9564e62d389876d0e5fe5cc06fb9412d9d1cb61b',
+          },
+        ],
+        '0x38': [
+          {
+            name: 'BNB',
+            signature:
+              '0x28ae371904b3ba71344e426c8de0e2cee0b8529a9510c059b412671655881ad646b8cf544342a5f8e0753eda83221e14e3c9dae5435417401f5fee8ee1d63dce1b',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
           },
         ],
-        '0x530': [
+        '0x92': [
           {
-            name: 'Sei Testnet',
+            address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
+            name: 'Sonic Mainnet',
             signature:
-              '0x91135fcd7bfb9e2456c227ff12905128c3854db36775278d47b96c3c669f730c4063e3a62d94884617769bbad2868f35d725cb3b611d9bd1231bceb5967724711c',
+              '0x9f2a94332f2b71bff8a772053f47dbb65e26e5286341be0a3c55270d5549351f1dddb7566be0619b0150d42d540b0847cb0acbd0ab118ff608a40a18400834711b',
+          },
+        ],
+        '0x1079': [
+          {
+            name: 'Tempo',
+            signature:
+              '0x810496170fb570d0d976c58273ad4a423252bac1f2e10c8a63adbbbfc4e79d2c5d894bae20c28e90a577338e68506138ac6dea142a1e80a31c0c2dd2999efa651b',
             address: '0x63c0c19a282a1B52b07dD5a65b58948A07DAE32B',
           },
         ],
@@ -940,7 +962,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      useBackendWebSocketService: true,
+      pollingIntervalMs: 86400000,
     },
     status: FeatureFlagStatus.Active,
   },
@@ -953,45 +975,356 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     // Contains acceleratedPolling per-chain configs, batchSizeLimit, etc.
     // Storing simplified version; full value has ~100 chain entries.
     productionDefault: {
+      batchSizeLimit: 10,
+      gasEstimateFallback: {
+        perChainConfig: {
+          '0x279f': {
+            fixed: 1000000,
+          },
+        },
+      },
       gasFeeRandomisation: {
         randomisedGasFeeDigits: {
           '0x2105': 5,
         },
       },
+      timeoutAttempts: {
+        perChainConfig: {
+          '0x38': 300,
+          '0x3e7': 240,
+          '0xa4b1': 800,
+          '0x2105': 100,
+        },
+        default: 30,
+      },
       acceleratedPolling: {
         perChainConfig: {
+          '0xcc': {
+            blockTime: 1000,
+            chainId: '204',
+            countMax: 10,
+            intervalMs: 700,
+            name: 'OPBNB',
+          },
+          '0xe8': {
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'LENS',
+            blockTime: 25333,
+            chainId: '232',
+          },
+          '0x2105': {
+            intervalMs: 1300,
+            name: 'BASE',
+            blockTime: 2000,
+            chainId: '8453',
+            countMax: 10,
+          },
+          '0x9c4400': {
+            name: 'ALIENX',
+            blockTime: 250,
+            chainId: '10241024',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0xb67d2': {
+            chainId: '747474',
+            countMax: 10,
+            intervalMs: 700,
+            name: 'KATANA',
+            blockTime: 1000,
+          },
+          '0x659': {
+            chainId: '1625',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'GRAVITY',
+            blockTime: 250,
+          },
+          '0xfee': {
+            blockTime: 250,
+            chainId: '4078',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'COMETH',
+          },
+          '0x2a': {
+            chainId: '42',
+            countMax: 10,
+            intervalMs: 2700,
+            name: 'LUKSO',
+            blockTime: 4000,
+          },
+          '0x8173': {
+            name: 'APECHAIN',
+            blockTime: 250,
+            chainId: '33139',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x7cc': {
+            name: 'SANKO',
+            blockTime: 250,
+            chainId: '1996',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x10e6': {
+            blockTime: 1000,
+            chainId: '4326',
+            countMax: 10,
+            intervalMs: 700,
+            name: 'MEGAETH_MAINNET',
+          },
+          '0x1331': {
+            chainId: '4913',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'API3',
+            blockTime: 250,
+          },
+          '0x1b59': {
+            blockTime: 3000,
+            chainId: '7001',
+            countMax: 10,
+            intervalMs: 2000,
+            name: 'ZETACHAIN_TESTNET',
+          },
+          '0xe705': {
+            chainId: '59141',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'LINEA_SEPOLIA',
+            blockTime: 2000,
+          },
+          '0x1388': {
+            name: 'MANTLE',
+            blockTime: 2000,
+            chainId: '5000',
+            countMax: 10,
+            intervalMs: 1300,
+          },
+          '0x15eb': {
+            blockTime: 1000,
+            chainId: '5611',
+            countMax: 10,
+            intervalMs: 700,
+            name: 'OPBNB_TESTNET',
+          },
+          '0x15a9': {
+            blockTime: 250,
+            chainId: '5545',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'DUCK',
+          },
+          '0x1b58': {
+            countMax: 10,
+            intervalMs: 2400,
+            name: 'ZETACHAIN',
+            blockTime: 3667,
+            chainId: '7000',
+          },
+          '0x3023': {
+            intervalMs: 500,
+            name: 'HUDDLE01',
+            blockTime: 250,
+            chainId: '12323',
+            countMax: 15,
+          },
+          '0xbde31': {
+            intervalMs: 500,
+            name: 'WINR',
+            blockTime: 250,
+            chainId: '777777',
+            countMax: 15,
+          },
+          '0x13881': {
+            chainId: '80001',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'POLYGON_MUMBAI',
+            blockTime: 2000,
+          },
+          '0xa4b1': {
+            countMax: 15,
+            intervalMs: 500,
+            name: 'ARBITRUM_ONE',
+            blockTime: 250,
+            chainId: '42161',
+          },
+          '0x62ef': {
+            intervalMs: 500,
+            name: 'EVERCLEAR',
+            blockTime: 250,
+            chainId: '25327',
+            countMax: 15,
+          },
+          '0x18232': {
+            intervalMs: 500,
+            name: 'PLUME',
+            blockTime: 667,
+            chainId: '98866',
+            countMax: 15,
+          },
+          '0x8f': {
+            blockTime: 500,
+            chainId: '143',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'MONAD',
+          },
+          '0x46f': {
+            blockTime: 2000,
+            chainId: '1135',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'LISK',
+          },
+          '0xd7cc': {
+            blockTime: 250,
+            chainId: '55244',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'SUPERPOSITION',
+          },
+          '0x974': {
+            name: 'DOGELON',
+            blockTime: 250,
+            chainId: '2420',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x9c4401': {
+            countMax: 15,
+            intervalMs: 500,
+            name: 'ALIENX_TESTNET',
+            blockTime: 250,
+            chainId: '10241025',
+          },
+          '0xa6': {
+            chainId: '166',
+            countMax: 10,
+            intervalMs: 900,
+            name: 'OMNI',
+            blockTime: 1333,
+          },
+          '0x52415249': {
+            name: 'RARIBLE',
+            blockTime: 250,
+            chainId: '1380012617',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0xe34': {
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'BOTANIX_TESTNET',
+            blockTime: 6000,
+            chainId: '3636',
+          },
+          '0x813df': {
+            chainId: '529375',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'LAYER_K',
+            blockTime: 250,
+          },
+          '0x98967f': {
+            name: 'FLUENCE',
+            blockTime: 250,
+            chainId: '9999999',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x18c7': {
+            chainId: '6343',
+            countMax: 10,
+            intervalMs: 700,
+            name: 'MEGAETH_TESTNET_V2',
+            blockTime: 1000,
+          },
+          '0xa86a': {
+            intervalMs: 700,
+            name: 'AVALANCHE',
+            blockTime: 1000,
+            chainId: '43114',
+            countMax: 10,
+          },
+          '0x13c23': {
+            chainId: '80931',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'FORTA',
+            blockTime: 250,
+          },
+          '0x144': {
+            chainId: '324',
+            countMax: 10,
+            intervalMs: 700,
+            name: 'ZKSYNC',
+            blockTime: 1000,
+          },
+          '0xa9': {
+            chainId: '169',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'MANTA',
+            blockTime: 2000,
+          },
           '0xe49b1': {
+            countMax: 15,
+            intervalMs: 500,
             name: 'LOGX',
             blockTime: 250,
             chainId: '936369',
+          },
+          '0x1713c': {
+            name: 'IDEX',
+            blockTime: 250,
+            chainId: '94524',
             countMax: 15,
             intervalMs: 500,
           },
-          '0x32': {
+          '0xb9': {
+            name: 'MINT',
+            blockTime: 2000,
+            chainId: '185',
             countMax: 10,
             intervalMs: 1300,
-            name: 'XDC',
+          },
+          '0xa': {
             blockTime: 2000,
-            chainId: '50',
+            chainId: '10',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'OPTIMISM',
           },
-          '0xe4': {
+          '0xa0c71fd': {
+            name: 'BLAST_SEPOLIA',
+            blockTime: 2000,
+            chainId: '168587773',
+            countMax: 10,
+            intervalMs: 1300,
+          },
+          '0x18c6': {
+            intervalMs: 700,
+            name: 'MEGAETH_TESTNET',
+            blockTime: 1000,
+            chainId: '6342',
+            countMax: 10,
+          },
+          '0x74c': {
+            chainId: '1868',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'SONEIUM',
+            blockTime: 2000,
+          },
+          '0x142b6': {
+            name: 'VEMP',
             blockTime: 250,
-            chainId: '228',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'MIND',
-          },
-          '0x6f0': {
-            intervalMs: 500,
-            name: 'INJECTIVE',
-            blockTime: 667,
-            chainId: '1776',
-            countMax: 15,
-          },
-          '0x1331': {
-            name: 'API3',
-            blockTime: 250,
-            chainId: '4913',
+            chainId: '82614',
             countMax: 15,
             intervalMs: 500,
           },
@@ -1002,495 +1335,47 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             chainId: '1989',
             countMax: 15,
           },
-          '0x28c61': {
-            intervalMs: 700,
-            name: 'TAIKO_HEKLA',
-            blockTime: 1000,
-            chainId: '167009',
-            countMax: 10,
-          },
-          '0x18c6': {
-            countMax: 10,
-            intervalMs: 700,
-            name: 'MEGAETH_TESTNET',
-            blockTime: 1000,
-            chainId: '6342',
-          },
-          '0x531': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'SEI',
-            blockTime: 667,
-            chainId: '1329',
-          },
-          '0xe705': {
-            blockTime: 2000,
-            chainId: '59141',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'LINEA_SEPOLIA',
-          },
-          '0xfee': {
-            intervalMs: 500,
-            name: 'COMETH',
-            blockTime: 250,
-            chainId: '4078',
-            countMax: 15,
-          },
-          '0xbde31': {
-            chainId: '777777',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'WINR',
-            blockTime: 250,
-          },
-          '0x8173': {
-            blockTime: 250,
-            chainId: '33139',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'APECHAIN',
-          },
-          '0xaa36a7': {
-            blockTime: 12000,
-            chainId: '11155111',
-            countMax: 10,
-            intervalMs: 3000,
-            name: 'ETHEREUM_SEPOLIA',
-          },
-          '0x13e31': {
-            blockTime: 2000,
-            chainId: '81457',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'BLAST',
-          },
-          '0x659': {
-            blockTime: 250,
-            chainId: '1625',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'GRAVITY',
-          },
-          '0xfa': {
-            intervalMs: 2700,
-            name: 'FANTOM',
-            blockTime: 4000,
-            chainId: '250',
-            countMax: 10,
-          },
-          '0x11c3': {
-            blockTime: 250,
-            chainId: '4547',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'TRUMPCHAIN',
-          },
-          '0xf4290': {
-            name: 'SCOREKOUNT',
-            blockTime: 250,
-            chainId: '1000080',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0xfc': {
-            chainId: '252',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'FRAXTAL',
-            blockTime: 2000,
-          },
-          '0x64': {
-            name: 'GNOSIS',
-            blockTime: 5000,
-            chainId: '100',
-            countMax: 10,
-            intervalMs: 3000,
-          },
-          '0x88bb0': {
-            intervalMs: 3000,
-            name: 'HOODI',
-            blockTime: 12000,
-            chainId: '560048',
-            countMax: 10,
-          },
-          '0x144': {
-            name: 'ZKSYNC',
-            blockTime: 1000,
-            chainId: '324',
-            countMax: 10,
-            intervalMs: 700,
-          },
-          '0x725': {
-            chainId: '1829',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'PLAYBLOCK',
-            blockTime: 250,
-          },
-          '0x1042': {
-            chainId: '4162',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'SX_ROLLUP',
-            blockTime: 250,
-          },
-          '0x13a': {
-            blockTime: 12000,
-            chainId: '314',
-            countMax: 10,
-            intervalMs: 3000,
-            name: 'FILECOIN',
-          },
-          '0x2272': {
-            chainId: '8818',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'CLINK',
-            blockTime: 250,
-          },
-          '0x10e6': {
-            name: 'MEGAETH_MAINNET',
-            blockTime: 1000,
-            chainId: '4326',
-            countMax: 10,
-            intervalMs: 700,
-          },
-          '0x1ecf': {
-            intervalMs: 500,
-            name: 'KINTO',
-            blockTime: 250,
-            chainId: '7887',
-            countMax: 15,
-          },
-          '0xb1c9': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'BLESSNET',
-            blockTime: 250,
-            chainId: '45513',
-          },
-          '0x8279': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'SLINGSHOTDAO',
-            blockTime: 250,
-            chainId: '33401',
-          },
-          '0xa6': {
-            chainId: '166',
-            countMax: 10,
-            intervalMs: 900,
-            name: 'OMNI',
-            blockTime: 1333,
-          },
-          '0x82750': {
-            blockTime: 1000,
-            chainId: '534352',
-            countMax: 10,
-            intervalMs: 700,
-            name: 'SCROLL',
-          },
-          '0xab5': {
-            countMax: 10,
-            intervalMs: 2700,
-            name: 'ABSTRACT',
-            blockTime: 4000,
-            chainId: '2741',
-          },
-          '0x9dd': {
-            name: 'INEVM',
-            blockTime: 250,
-            chainId: '2525',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x2a': {
-            name: 'LUKSO',
-            blockTime: 4000,
-            chainId: '42',
-            countMax: 10,
-            intervalMs: 2700,
-          },
-          '0xb5f': {
-            intervalMs: 500,
-            name: 'HYTOPIA',
-            blockTime: 250,
-            chainId: '2911',
-            countMax: 15,
-          },
-          '0x82': {
-            name: 'UNICHAIN',
-            blockTime: 2000,
-            chainId: '130',
-            countMax: 10,
-            intervalMs: 1300,
-          },
-          '0x16fd8': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'LUMITERRA',
-            blockTime: 250,
-            chainId: '94168',
-          },
-          '0x1b58': {
-            countMax: 10,
-            intervalMs: 2400,
-            name: 'ZETACHAIN',
-            blockTime: 3667,
-            chainId: '7000',
-          },
-          '0x46f': {
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'LISK',
-            blockTime: 2000,
-            chainId: '1135',
-          },
-          '0x14a34': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'BASE_SEPOLIA_TESTNET',
-            blockTime: 250,
-            chainId: '84532',
-          },
-          '0x1b254': {
-            intervalMs: 500,
-            name: 'REAL',
-            blockTime: 250,
-            chainId: '111188',
-            countMax: 15,
-          },
           '0x76adf1': {
+            countMax: 10,
             intervalMs: 1300,
             name: 'ZORA',
             blockTime: 2000,
             chainId: '7777777',
-            countMax: 10,
           },
-          '0xb67d2': {
-            chainId: '747474',
-            countMax: 10,
-            intervalMs: 700,
-            name: 'KATANA',
-            blockTime: 1000,
-          },
-          '0x515': {
-            chainId: '1301',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'UNICHAIN_SEPOLIA',
-            blockTime: 2000,
-          },
-          '0x1': {
-            name: 'ETHEREUM',
+          '0xaa36a7': {
+            name: 'ETHEREUM_SEPOLIA',
             blockTime: 12000,
-            chainId: '1',
+            chainId: '11155111',
             countMax: 10,
             intervalMs: 3000,
           },
-          '0xa1337': {
-            intervalMs: 500,
-            name: 'XAI',
-            blockTime: 250,
-            chainId: '660279',
-            countMax: 15,
-          },
-          '0x13882': {
-            chainId: '80002',
-            countMax: 10,
-            intervalMs: 1100,
-            name: 'POLYGON_AMOY',
-            blockTime: 1667,
-          },
-          '0x89': {
-            chainId: '137',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'POLYGON',
-            blockTime: 2000,
-          },
-          '0xa': {
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'OPTIMISM',
-            blockTime: 2000,
-            chainId: '10',
-          },
-          '0x13c23': {
-            name: 'FORTA',
-            blockTime: 250,
-            chainId: '80931',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0xc350': {
-            blockTime: 250,
-            chainId: '50000',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'CITRONUS',
-          },
-          '0xa4b1': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'ARBITRUM_ONE',
-            blockTime: 250,
-            chainId: '42161',
-          },
-          '0xa33fc': {
-            name: 'CONWAI',
-            blockTime: 250,
-            chainId: '668668',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x343b': {
-            blockTime: 2000,
-            chainId: '13371',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'IMMUTABLE',
-          },
           '0x171': {
+            countMax: 10,
             intervalMs: 3000,
             name: 'PULSECHAIN',
             blockTime: 10000,
             chainId: '369',
-            countMax: 10,
           },
-          '0x16876': {
-            blockTime: 250,
-            chainId: '92278',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'MIRACLE',
-          },
-          '0x2ba': {
-            intervalMs: 1300,
-            name: 'MATCHAIN',
+          '0x123': {
             blockTime: 2000,
-            chainId: '698',
-            countMax: 10,
-          },
-          '0xe8': {
-            intervalMs: 3000,
-            name: 'LENS',
-            blockTime: 25333,
-            chainId: '232',
-            countMax: 10,
-          },
-          '0x13881': {
-            blockTime: 2000,
-            chainId: '80001',
+            chainId: '291',
             countMax: 10,
             intervalMs: 1300,
-            name: 'POLYGON_MUMBAI',
+            name: 'ORDERLY',
           },
-          '0xa3c3': {
-            name: 'EDUCHAIN',
+          '0x2780b': {
+            intervalMs: 500,
+            name: 'EVENTUM',
             blockTime: 250,
-            chainId: '41923',
+            chainId: '161803',
+            countMax: 15,
+          },
+          '0x531': {
+            name: 'SEI',
+            blockTime: 667,
+            chainId: '1329',
             countMax: 15,
             intervalMs: 500,
-          },
-          '0xa0c71fd': {
-            blockTime: 2000,
-            chainId: '168587773',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'BLAST_SEPOLIA',
-          },
-          '0x1142d': {
-            chainId: '70701',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'PROOF_OF_PLAY_BOSS',
-            blockTime: 250,
-          },
-          '0x9c4400': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'ALIENX',
-            blockTime: 250,
-            chainId: '10241024',
-          },
-          '0x15eb': {
-            name: 'OPBNB_TESTNET',
-            blockTime: 1000,
-            chainId: '5611',
-            countMax: 10,
-            intervalMs: 700,
-          },
-          '0x3bd': {
-            chainId: '957',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'LYRA',
-            blockTime: 2000,
-          },
-          '0xb9': {
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'MINT',
-            blockTime: 2000,
-            chainId: '185',
-          },
-          '0x42af': {
-            chainId: '17071',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'ONCHAIN_POINTS',
-            blockTime: 250,
-          },
-          '0x15b43': {
-            chainId: '88899',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'UNITE',
-            blockTime: 250,
-          },
-          '0x128ca': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'FUSION',
-            blockTime: 250,
-            chainId: '75978',
-          },
-          '0xa867': {
-            chainId: '43111',
-            countMax: 10,
-            intervalMs: 800,
-            name: 'HEMI',
-            blockTime: 1200,
-          },
-          '0x13a43': {
-            name: 'GEO_GENESIS',
-            blockTime: 250,
-            chainId: '80451',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x9c4401': {
-            name: 'ALIENX_TESTNET',
-            blockTime: 250,
-            chainId: '10241025',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x2b2': {
-            blockTime: 2000,
-            chainId: '690',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'REDSTONE',
-          },
-          '0x15a9': {
-            intervalMs: 500,
-            name: 'DUCK',
-            blockTime: 250,
-            chainId: '5545',
-            countMax: 15,
           },
           '0x134b3cf': {
             blockTime: 250,
@@ -1499,229 +1384,12 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             intervalMs: 500,
             name: 'DERI',
           },
-          '0x13bf8': {
+          '0xc350': {
             countMax: 15,
             intervalMs: 500,
-            name: 'ONYX',
+            name: 'CITRONUS',
             blockTime: 250,
-            chainId: '80888',
-          },
-          '0x2780b': {
-            blockTime: 250,
-            chainId: '161803',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'EVENTUM',
-          },
-          '0x1406f40': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'CORN',
-            blockTime: 250,
-            chainId: '21000000',
-          },
-          '0x99797f': {
-            blockTime: 250,
-            chainId: '10058111',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'SPOTLIGHT',
-          },
-          '0xaa37dc': {
-            intervalMs: 1300,
-            name: 'OPTIMISM_SEPOLIA',
-            blockTime: 2000,
-            chainId: '11155420',
-            countMax: 10,
-          },
-          '0x18232': {
-            blockTime: 667,
-            chainId: '98866',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'PLUME',
-          },
-          '0x279f': {
-            blockTime: 500,
-            chainId: '10143',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'MONAD_TESTNET',
-          },
-          '0x88b': {
-            blockTime: 250,
-            chainId: '2187',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'GAME7',
-          },
-          '0x28c58': {
-            countMax: 10,
-            intervalMs: 3000,
-            name: 'TAIKO',
-            blockTime: 6000,
-            chainId: '167000',
-          },
-          '0x38': {
-            blockTime: 667,
-            chainId: '56',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'BNB',
-          },
-          '0xa86a': {
-            countMax: 10,
-            intervalMs: 700,
-            name: 'AVALANCHE',
-            blockTime: 1000,
-            chainId: '43114',
-          },
-          '0x813df': {
-            name: 'LAYER_K',
-            blockTime: 250,
-            chainId: '529375',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x3023': {
-            intervalMs: 500,
-            name: 'HUDDLE01',
-            blockTime: 250,
-            chainId: '12323',
-            countMax: 15,
-          },
-          '0x5d979': {
-            name: 'CHEESE',
-            blockTime: 250,
-            chainId: '383353',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x868b': {
-            intervalMs: 1300,
-            name: 'MODE',
-            blockTime: 2000,
-            chainId: '34443',
-            countMax: 10,
-          },
-          '0x163e7': {
-            blockTime: 250,
-            chainId: '91111',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'HENEZ',
-          },
-          '0x316b8': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'BLOCKFIT',
-            blockTime: 250,
-            chainId: '202424',
-          },
-          '0xa9': {
-            chainId: '169',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'MANTA',
-            blockTime: 2000,
-          },
-          '0x19': {
-            name: 'CRONOS',
-            blockTime: 667,
-            chainId: '25',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x2105': {
-            name: 'BASE',
-            blockTime: 2000,
-            chainId: '8453',
-            countMax: 10,
-            intervalMs: 1300,
-          },
-          '0x138de': {
-            chainId: '80094',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'BERACHAIN',
-            blockTime: 2000,
-          },
-          '0x2f0': {
-            name: 'RIVALZ',
-            blockTime: 250,
-            chainId: '752',
-            countMax: 15,
-            intervalMs: 500,
-          },
-          '0x123': {
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'ORDERLY',
-            blockTime: 2000,
-            chainId: '291',
-          },
-          '0x3e7': {
-            name: 'HYPEREVM',
-            blockTime: 1000,
-            chainId: '999',
-            countMax: 10,
-            intervalMs: 700,
-          },
-          '0xd0d0': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'DODO',
-            blockTime: 250,
-            chainId: '53456',
-          },
-          '0xd7cc': {
-            blockTime: 250,
-            chainId: '55244',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'SUPERPOSITION',
-          },
-          '0x27bc86aa': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'DEGEN_CHAIN',
-            blockTime: 250,
-            chainId: '666666666',
-          },
-          '0x52415249': {
-            intervalMs: 500,
-            name: 'RARIBLE',
-            blockTime: 250,
-            chainId: '1380012617',
-            countMax: 15,
-          },
-          '0x974': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'DOGELON',
-            blockTime: 250,
-            chainId: '2420',
-          },
-          '0xa4ba': {
-            countMax: 15,
-            intervalMs: 500,
-            name: 'ARBITRUM_NOVA',
-            blockTime: 250,
-            chainId: '42170',
-          },
-          '0x62ef': {
-            chainId: '25327',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'EVERCLEAR',
-            blockTime: 250,
-          },
-          '0xa1ef': {
-            chainId: '41455',
-            countMax: 15,
-            intervalMs: 500,
-            name: 'ALEPH_ZERO',
-            blockTime: 250,
+            chainId: '50000',
           },
           '0x7ea': {
             name: 'EDGELESS',
@@ -1730,96 +1398,488 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             countMax: 10,
             intervalMs: 1300,
           },
-          '0x74c': {
-            name: 'SONEIUM',
+          '0x32': {
             blockTime: 2000,
-            chainId: '1868',
+            chainId: '50',
             countMax: 10,
             intervalMs: 1300,
+            name: 'XDC',
           },
-          '0xe34': {
-            chainId: '3636',
-            countMax: 10,
-            intervalMs: 3000,
-            name: 'BOTANIX_TESTNET',
-            blockTime: 6000,
-          },
-          '0xe35': {
-            countMax: 10,
-            intervalMs: 3000,
-            name: 'BOTANIX',
-            blockTime: 5667,
-            chainId: '3637',
-          },
-          '0x7cc': {
-            name: 'SANKO',
+          '0x1b254': {
+            name: 'REAL',
             blockTime: 250,
-            chainId: '1996',
+            chainId: '111188',
             countMax: 15,
             intervalMs: 500,
           },
-          '0x61': {
+          '0xb5f': {
+            name: 'HYTOPIA',
+            blockTime: 250,
+            chainId: '2911',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x725': {
+            countMax: 15,
+            intervalMs: 500,
+            name: 'PLAYBLOCK',
+            blockTime: 250,
+            chainId: '1829',
+          },
+          '0x1': {
+            blockTime: 12000,
+            chainId: '1',
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'ETHEREUM',
+          },
+          '0x2f0': {
+            intervalMs: 500,
+            name: 'RIVALZ',
+            blockTime: 250,
+            chainId: '752',
+            countMax: 15,
+          },
+          '0xfa': {
+            blockTime: 4000,
+            chainId: '250',
+            countMax: 10,
+            intervalMs: 2700,
+            name: 'FANTOM',
+          },
+          '0x11c3': {
+            intervalMs: 500,
+            name: 'TRUMPCHAIN',
+            blockTime: 250,
+            chainId: '4547',
+            countMax: 15,
+          },
+          '0x64': {
+            blockTime: 5000,
+            chainId: '100',
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'GNOSIS',
+          },
+          '0x82750': {
+            name: 'SCROLL',
+            blockTime: 1000,
+            chainId: '534352',
             countMax: 10,
             intervalMs: 700,
-            name: 'BNB_TESTNET',
-            blockTime: 1000,
-            chainId: '97',
+          },
+          '0x99797f': {
+            blockTime: 250,
+            chainId: '10058111',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'SPOTLIGHT',
+          },
+          '0x16876': {
+            countMax: 15,
+            intervalMs: 500,
+            name: 'MIRACLE',
+            blockTime: 250,
+            chainId: '92278',
+          },
+          '0x13bf8': {
+            name: 'ONYX',
+            blockTime: 250,
+            chainId: '80888',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x5d979': {
+            intervalMs: 500,
+            name: 'CHEESE',
+            blockTime: 250,
+            chainId: '383353',
+            countMax: 15,
+          },
+          '0x42af': {
+            countMax: 15,
+            intervalMs: 500,
+            name: 'ONCHAIN_POINTS',
+            blockTime: 250,
+            chainId: '17071',
+          },
+          '0xa3c3': {
+            chainId: '41923',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'EDUCHAIN',
+            blockTime: 250,
+          },
+          '0xfc': {
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'FRAXTAL',
+            blockTime: 2000,
+            chainId: '252',
           },
           '0x2eb': {
+            name: 'FLOW',
             blockTime: 1000,
             chainId: '747',
             countMax: 10,
             intervalMs: 700,
-            name: 'FLOW',
           },
-          '0xcc': {
-            chainId: '204',
+          '0x3bd': {
             countMax: 10,
-            intervalMs: 700,
-            name: 'OPBNB',
-            blockTime: 1000,
+            intervalMs: 1300,
+            name: 'LYRA',
+            blockTime: 2000,
+            chainId: '957',
           },
-          '0x8f': {
-            chainId: '143',
+          '0x279f': {
+            intervalMs: 500,
+            name: 'MONAD_TESTNET',
+            blockTime: 500,
+            chainId: '10143',
+            countMax: 15,
+          },
+          '0xa1ef': {
             countMax: 15,
             intervalMs: 500,
-            name: 'MONAD',
-            blockTime: 500,
+            name: 'ALEPH_ZERO',
+            blockTime: 250,
+            chainId: '41455',
           },
           '0x34fb5e38': {
-            intervalMs: 1300,
             name: 'ANXIENT8',
             blockTime: 2000,
             chainId: '888888888',
             countMax: 10,
+            intervalMs: 1300,
           },
-          '0x6c1': {
-            intervalMs: 500,
-            name: 'REYA',
-            blockTime: 250,
-            chainId: '1729',
-            countMax: 15,
+          '0x88bb0': {
+            intervalMs: 3000,
+            name: 'HOODI',
+            blockTime: 12000,
+            chainId: '560048',
+            countMax: 10,
           },
-          '0x1142c': {
-            intervalMs: 500,
-            name: 'PROOF_OF_PLAY_APEX',
+          '0xaa37dc': {
+            chainId: '11155420',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'OPTIMISM_SEPOLIA',
+            blockTime: 2000,
+          },
+          '0x61': {
+            intervalMs: 700,
+            name: 'BNB_TESTNET',
+            blockTime: 1000,
+            chainId: '97',
+            countMax: 10,
+          },
+          '0xb1c9': {
             blockTime: 250,
-            chainId: '70700',
+            chainId: '45513',
             countMax: 15,
+            intervalMs: 500,
+            name: 'BLESSNET',
+          },
+          '0xd0d0': {
+            name: 'DODO',
+            blockTime: 250,
+            chainId: '53456',
+            countMax: 15,
+            intervalMs: 500,
           },
           '0x8274f': {
-            name: 'SCROLL_SEPOLIA',
             blockTime: 3667,
             chainId: '534351',
             countMax: 10,
             intervalMs: 2400,
+            name: 'SCROLL_SEPOLIA',
           },
-          '0x18c7': {
-            name: 'MEGAETH_TESTNET_V2',
-            blockTime: 1000,
-            chainId: '6343',
+          '0x316b8': {
+            chainId: '202424',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'BLOCKFIT',
+            blockTime: 250,
+          },
+          '0x2611': {
+            chainId: '9745',
             countMax: 10,
             intervalMs: 700,
+            name: 'PLASMA',
+            blockTime: 1000,
+          },
+          '0x6c1': {
+            blockTime: 250,
+            chainId: '1729',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'REYA',
+          },
+          '0x4268': {
+            intervalMs: 3000,
+            name: 'ETHEREUM_HOLESKY',
+            blockTime: 12000,
+            chainId: '17000',
+            countMax: 10,
+          },
+          '0x13f8': {
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'HAM',
+            blockTime: 2000,
+            chainId: '5112',
+          },
+          '0x1ecf': {
+            intervalMs: 500,
+            name: 'KINTO',
+            blockTime: 250,
+            chainId: '7887',
+            countMax: 15,
+          },
+          '0x2ba': {
+            intervalMs: 1300,
+            name: 'MATCHAIN',
+            blockTime: 2000,
+            chainId: '698',
+            countMax: 10,
+          },
+          '0x13e31': {
+            intervalMs: 1300,
+            name: 'BLAST',
+            blockTime: 2000,
+            chainId: '81457',
+            countMax: 10,
+          },
+          '0xa1337': {
+            intervalMs: 500,
+            name: 'XAI',
+            blockTime: 250,
+            chainId: '660279',
+            countMax: 15,
+          },
+          '0x2b2': {
+            blockTime: 2000,
+            chainId: '690',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'REDSTONE',
+          },
+          '0x1142c': {
+            name: 'PROOF_OF_PLAY_APEX',
+            blockTime: 250,
+            chainId: '70700',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0xa4ba': {
+            intervalMs: 500,
+            name: 'ARBITRUM_NOVA',
+            blockTime: 250,
+            chainId: '42170',
+            countMax: 15,
+          },
+          '0x2272': {
+            blockTime: 250,
+            chainId: '8818',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'CLINK',
+          },
+          '0x163e7': {
+            chainId: '91111',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'HENEZ',
+            blockTime: 250,
+          },
+          '0x138de': {
+            chainId: '80094',
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'BERACHAIN',
+            blockTime: 2000,
+          },
+          '0x82': {
+            intervalMs: 1300,
+            name: 'UNICHAIN',
+            blockTime: 2000,
+            chainId: '130',
+            countMax: 10,
+          },
+          '0x16fd8': {
+            intervalMs: 500,
+            name: 'LUMITERRA',
+            blockTime: 250,
+            chainId: '94168',
+            countMax: 15,
+          },
+          '0x28c58': {
+            chainId: '167000',
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'TAIKO',
+            blockTime: 6000,
+          },
+          '0x38': {
+            name: 'BNB',
+            blockTime: 667,
+            chainId: '56',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0xa33fc': {
+            intervalMs: 500,
+            name: 'CONWAI',
+            blockTime: 250,
+            chainId: '668668',
+            countMax: 15,
+          },
+          '0x15b43': {
+            name: 'UNITE',
+            blockTime: 250,
+            chainId: '88899',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x27bc86aa': {
+            name: 'DEGEN_CHAIN',
+            blockTime: 250,
+            chainId: '666666666',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x343b': {
+            countMax: 10,
+            intervalMs: 1300,
+            name: 'IMMUTABLE',
+            blockTime: 2000,
+            chainId: '13371',
+          },
+          '0x1406f40': {
+            intervalMs: 500,
+            name: 'CORN',
+            blockTime: 250,
+            chainId: '21000000',
+            countMax: 15,
+          },
+          '0x13a': {
+            blockTime: 12000,
+            chainId: '314',
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'FILECOIN',
+          },
+          '0x89': {
+            name: 'POLYGON',
+            blockTime: 2000,
+            chainId: '137',
+            countMax: 10,
+            intervalMs: 1300,
+          },
+          '0x9dd': {
+            name: 'INEVM',
+            blockTime: 250,
+            chainId: '2525',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0xe35': {
+            blockTime: 5667,
+            chainId: '3637',
+            countMax: 10,
+            intervalMs: 3000,
+            name: 'BOTANIX',
+          },
+          '0x868b': {
+            intervalMs: 1300,
+            name: 'MODE',
+            blockTime: 2000,
+            chainId: '34443',
+            countMax: 10,
+          },
+          '0x13a43': {
+            name: 'GEO_GENESIS',
+            blockTime: 250,
+            chainId: '80451',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x3e7': {
+            countMax: 10,
+            intervalMs: 700,
+            name: 'HYPEREVM',
+            blockTime: 1000,
+            chainId: '999',
+          },
+          '0x1142d': {
+            intervalMs: 500,
+            name: 'PROOF_OF_PLAY_BOSS',
+            blockTime: 250,
+            chainId: '70701',
+            countMax: 15,
+          },
+          '0x19': {
+            intervalMs: 500,
+            name: 'CRONOS',
+            blockTime: 667,
+            chainId: '25',
+            countMax: 15,
+          },
+          '0xe4': {
+            name: 'MIND',
+            blockTime: 250,
+            chainId: '228',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x14a34': {
+            name: 'BASE_SEPOLIA_TESTNET',
+            blockTime: 250,
+            chainId: '84532',
+            countMax: 15,
+            intervalMs: 500,
+          },
+          '0x128ca': {
+            blockTime: 250,
+            chainId: '75978',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'FUSION',
+          },
+          '0x6f0': {
+            blockTime: 667,
+            chainId: '1776',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'INJECTIVE',
+          },
+          '0x28c61': {
+            name: 'TAIKO_HEKLA',
+            blockTime: 1000,
+            chainId: '167009',
+            countMax: 10,
+            intervalMs: 700,
+          },
+          '0x88b': {
+            intervalMs: 500,
+            name: 'GAME7',
+            blockTime: 250,
+            chainId: '2187',
+            countMax: 15,
+          },
+          '0x13882': {
+            countMax: 10,
+            intervalMs: 1100,
+            name: 'POLYGON_AMOY',
+            blockTime: 1667,
+            chainId: '80002',
+          },
+          '0xf4290': {
+            blockTime: 250,
+            chainId: '1000080',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'SCOREKOUNT',
           },
           '0xe708': {
             countMax: 10,
@@ -1828,87 +1888,58 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
             blockTime: 2000,
             chainId: '59144',
           },
-          '0x13f8': {
-            chainId: '5112',
-            countMax: 10,
-            intervalMs: 1300,
-            name: 'HAM',
-            blockTime: 2000,
-          },
-          '0x98967f': {
+          '0x1042': {
             intervalMs: 500,
-            name: 'FLUENCE',
+            name: 'SX_ROLLUP',
             blockTime: 250,
-            chainId: '9999999',
+            chainId: '4162',
             countMax: 15,
           },
-          '0x142b6': {
-            intervalMs: 500,
-            name: 'VEMP',
-            blockTime: 250,
-            chainId: '82614',
-            countMax: 15,
-          },
-          '0x4268': {
-            chainId: '17000',
+          '0xa867': {
+            name: 'HEMI',
+            blockTime: 1200,
+            chainId: '43111',
             countMax: 10,
-            intervalMs: 3000,
-            name: 'ETHEREUM_HOLESKY',
-            blockTime: 12000,
+            intervalMs: 800,
           },
-          '0x2611': {
-            blockTime: 1000,
-            chainId: '9745',
+          '0xab5': {
+            intervalMs: 2700,
+            name: 'ABSTRACT',
+            blockTime: 4000,
+            chainId: '2741',
             countMax: 10,
-            intervalMs: 700,
-            name: 'PLASMA',
           },
           '0xca74': {
+            chainId: '51828',
             countMax: 15,
             intervalMs: 500,
             name: 'CHAINBOUNTY',
             blockTime: 250,
-            chainId: '51828',
-          },
-          '0x1713c': {
-            intervalMs: 500,
-            name: 'IDEX',
-            blockTime: 250,
-            chainId: '94524',
-            countMax: 15,
-          },
-          '0x1388': {
-            intervalMs: 1300,
-            name: 'MANTLE',
-            blockTime: 2000,
-            chainId: '5000',
-            countMax: 10,
-          },
-          '0x1b59': {
-            intervalMs: 2000,
-            name: 'ZETACHAIN_TESTNET',
-            blockTime: 3000,
-            chainId: '7001',
-            countMax: 10,
           },
           '0x34a1': {
+            countMax: 10,
+            intervalMs: 1300,
             name: 'IMMUTABLE_TESTNET',
             blockTime: 2000,
             chainId: '13473',
+          },
+          '0x515': {
+            blockTime: 2000,
+            chainId: '1301',
             countMax: 10,
             intervalMs: 1300,
+            name: 'UNICHAIN_SEPOLIA',
+          },
+          '0x8279': {
+            blockTime: 250,
+            chainId: '33401',
+            countMax: 15,
+            intervalMs: 500,
+            name: 'SLINGSHOTDAO',
           },
         },
         defaultCountMax: 10,
         defaultIntervalMs: 3000,
-      },
-      batchSizeLimit: 10,
-      gasEstimateFallback: {
-        perChainConfig: {
-          '0x279f': {
-            fixed: 1000000,
-          },
-        },
       },
     },
     status: FeatureFlagStatus.Active,
@@ -1918,67 +1949,67 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      '0xa86a': {
+      '0xa': {
         extensionActive: false,
-        sentinelUrl: 'https://tx-sentinel-avalanche-mainnet.api.cx.metamask.io',
-      },
-      '0x2105': {
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: true,
-        sentinelUrl: 'https://tx-sentinel-base-mainnet.api.cx.metamask.io',
-      },
-      '0xe708': {
-        sentinelUrl: 'https://tx-sentinel-linea-mainnet.api.cx.metamask.io',
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: false,
-      },
-      '0x89': {
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: true,
-        sentinelUrl: 'https://tx-sentinel-polygon-mainnet.api.cx.metamask.io',
-      },
-      '0x1': {
-        maxDeadline: 160,
-        sentinelUrl: 'https://tx-sentinel-ethereum-mainnet.api.cx.metamask.io',
-        expectedDeadline: 45,
-        extensionActive: true,
-        gaslessBridgeWith7702Enabled: false,
+        sentinelUrl: 'https://tx-sentinel-optimism-mainnet.api.cx.metamask.io',
       },
       '0xa4b1': {
         gaslessBridgeWith7702Enabled: true,
         sentinelUrl: 'https://tx-sentinel-arbitrum-mainnet.api.cx.metamask.io',
         extensionActive: true,
       },
+      '0x2105': {
+        gaslessBridgeWith7702Enabled: true,
+        sentinelUrl: 'https://tx-sentinel-base-mainnet.api.cx.metamask.io',
+        extensionActive: true,
+      },
+      '0x8f': {
+        sentinelUrl: 'https://tx-sentinel-monad-mainnet.api.cx.metamask.io',
+        extensionActive: false,
+      },
+      '0x144': {
+        extensionActive: false,
+        sentinelUrl: 'https://tx-sentinel-zksync-mainnet.api.cx.metamask.io',
+      },
+      '0x89': {
+        gaslessBridgeWith7702Enabled: true,
+        sentinelUrl: 'https://tx-sentinel-polygon-mainnet.api.cx.metamask.io',
+        extensionActive: true,
+      },
       default: {
+        extensionReturnTxHashAsapBatch: true,
+        extensionSkipSmartTransactionStatusPage: false,
+        gaslessBridgeWith7702Enabled: false,
         maxDeadline: 150,
         batchStatusPollingInterval: 1000,
         expectedDeadline: 45,
         extensionActive: false,
         extensionReturnTxHashAsap: true,
-        extensionReturnTxHashAsapBatch: true,
-        extensionSkipSmartTransactionStatusPage: false,
-        gaslessBridgeWith7702Enabled: false,
       },
       '0x531': {
+        extensionActive: false,
         sentinelUrl: 'https://tx-sentinel-sei-mainnet.api.cx.metamask.io',
-        extensionActive: false,
       },
-      '0x144': {
-        sentinelUrl: 'https://tx-sentinel-zksync-mainnet.api.cx.metamask.io',
-        extensionActive: false,
-      },
-      '0xa': {
-        extensionActive: false,
-        sentinelUrl: 'https://tx-sentinel-optimism-mainnet.api.cx.metamask.io',
-      },
-      '0x38': {
+      '0x1': {
+        expectedDeadline: 45,
         extensionActive: true,
         gaslessBridgeWith7702Enabled: false,
-        sentinelUrl: 'https://tx-sentinel-bsc-mainnet.api.cx.metamask.io',
+        maxDeadline: 160,
+        sentinelUrl: 'https://tx-sentinel-ethereum-mainnet.api.cx.metamask.io',
       },
-      '0x8f': {
+      '0x38': {
+        gaslessBridgeWith7702Enabled: false,
+        sentinelUrl: 'https://tx-sentinel-bsc-mainnet.api.cx.metamask.io',
+        extensionActive: true,
+      },
+      '0xe708': {
+        extensionActive: true,
+        gaslessBridgeWith7702Enabled: true,
+        sentinelUrl: 'https://tx-sentinel-linea-mainnet.api.cx.metamask.io',
+      },
+      '0xa86a': {
+        sentinelUrl: 'https://tx-sentinel-avalanche-mainnet.api.cx.metamask.io',
         extensionActive: false,
-        sentinelUrl: 'https://tx-sentinel-monad-mainnet.api.cx.metamask.io',
       },
     },
     status: FeatureFlagStatus.Active,
@@ -2080,8 +2111,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      minimumVersion: '0.0.0',
-      enabled: false,
+      enabled: true,
+      minimumVersion: '13.32.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2099,17 +2130,9 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      enabled: false,
-      minimumVersion: '0.0.0',
+      minimumVersion: '13.28.0',
+      enabled: true,
     },
-    status: FeatureFlagStatus.Active,
-  },
-
-  extensionUxDefiReferral: {
-    name: 'extensionUxDefiReferral',
-    type: FeatureFlagType.Remote,
-    inProd: true,
-    productionDefault: true,
     status: FeatureFlagStatus.Active,
   },
 
@@ -2118,6 +2141,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
+      variational: true,
       asterdex: true,
       gmx: true,
       hyperliquid: true,
@@ -2185,8 +2209,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      enabled: false,
-      minimumVersion: '13.15.0',
+      enabled: true,
+      minimumVersion: '13.30.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2195,7 +2219,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     name: 'perpsHip3AllowlistMarkets',
     type: FeatureFlagType.Remote,
     inProd: true,
-    productionDefault: 'xyz:*',
+    productionDefault: '',
     status: FeatureFlagStatus.Active,
   },
   rewardsBitcoinEnabledExtension: {
@@ -2211,8 +2235,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      enabled: false,
-      minimumVersion: '0.0.0',
+      enabled: true,
+      minimumVersion: '13.32.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2222,8 +2246,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      enabled: false,
-      minimumVersion: '0.0.0',
+      enabled: true,
+      minimumVersion: '13.32.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2301,6 +2325,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     inProd: true,
     productionDefault: {
       enabled: false,
+      minimumVersion: '0.0.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2311,7 +2336,85 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      name: 'empty',
+      attemptsMax: 4,
+      relayFallbackGas: {
+        estimate: '900001',
+        max: '1500001',
+      },
+      relayDisabledGasStationChains: [],
+      bufferSubsequent: 0.05,
+      bufferInitial: 0.015,
+      slippageTokens: {
+        '0x1': {
+          '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599': 0.005,
+          '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48': 0.005,
+          '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2': 0.005,
+          '0xacA92E438df0B2401fF60dA7E4337B687a2435DA': 0.005,
+          '0xdAC17F958D2ee523a2206206994597C13D831ec7': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+        },
+        '0x2105': {
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x4200000000000000000000000000000000000006': 0.005,
+          '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913': 0.005,
+          '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2': 0.005,
+        },
+        '0x38': {
+          '0x2170Ed0880ac9A755fd29B2688956BD959F933F8': 0.005,
+          '0x55d398326f99059fF775485246999027B3197955': 0.005,
+          '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c': 0.005,
+        },
+        '0x89': {
+          '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359': 0.005,
+          '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619': 0.005,
+          '0xc2132D05D31c914a87C6611C10748AEb04B58e8F': 0.005,
+          '0x0000000000000000000000000000000000001010': 0.005,
+          '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174': 0.005,
+        },
+        '0xa4b1': {
+          '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9': 0.005,
+          '0xaf88d065e77c8cC2239327C5EDb3A432268e5831': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+          '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1': 0.005,
+        },
+        '0xe708': {
+          '0x176211869cA2b568f2A7D4EE941E073a821EE1ff': 0.005,
+          '0xA219439258ca9da29E9Cc4cE5596924745e12B93': 0.005,
+          '0xacA92E438df0B2401fF60dA7E4337B687a2435DA': 0.005,
+          '0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f': 0.005,
+          '0x0000000000000000000000000000000000000000': 0.005,
+        },
+      },
+      bufferStep: 0.015,
+      perpsWithdrawAnyToken: false,
+      payStrategies: {
+        relay: {
+          enabled: true,
+          gaslessEnabled: false,
+        },
+      },
+      relayQuoteUrl: 'https://intents.api.cx.metamask.io/relay/quote',
+      allowedPredictWithdrawTokens: {
+        '0x38': [
+          '0x0000000000000000000000000000000000000000',
+          '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+        ],
+        '0x89': [
+          '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
+          '0x0000000000000000000000000000000000000000',
+          '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+        ],
+        '0x1': [
+          '0x0000000000000000000000000000000000000000',
+          '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+        ],
+      },
+      relayExecuteUrl: 'https://intents.api.cx.metamask.io/relay/execute',
+      strategyOrder: ['relay'],
+      predictWithdrawAnyToken: true,
+      slippage: 0.02,
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2365,8 +2468,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      minimumVersion: '13.26.0',
       enabled: true,
+      minimumVersion: '13.27.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2435,7 +2538,7 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      blockedRegions: ['BE', 'US', 'CA-ON', 'GB'],
+      blockedRegions: ['BE', 'US', 'CA-ON', 'GB', 'CU', 'IR', 'KP', 'SY'],
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2472,7 +2575,716 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     name: 'perpsHip3BlocklistMarkets',
     type: FeatureFlagType.Remote,
     inProd: true,
-    productionDefault: 'variation 2',
+    productionDefault: '',
+    status: FeatureFlagStatus.Active,
+  },
+  assetsAccountsApiV6: {
+    name: 'assetsAccountsApiV6',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'feature is ON',
+        scope: {
+          value: 0,
+          type: 'threshold',
+        },
+        value: true,
+      },
+      {
+        scope: {
+          value: 1,
+          type: 'threshold',
+        },
+        value: false,
+        name: 'feature is OFF',
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  batchSell: {
+    name: 'batchSell',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {},
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  bridgeQuoteStatusManager: {
+    name: 'bridgeQuoteStatusManager',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.39.0': {
+          enabled: true,
+        },
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  confirmations_enforced_simulations: {
+    name: 'confirmations_enforced_simulations',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {},
+    status: FeatureFlagStatus.Active,
+  },
+
+  confirmations_pay_extended: {
+    name: 'confirmations_pay_extended',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        scope: {
+          type: 'threshold',
+          value: 0.5,
+        },
+        thresholdName: 'control',
+        thresholdVersion: 2,
+        value: {
+          payStrategies: {
+            relay: {
+              gaslessEnabled: true,
+            },
+          },
+          prefilledAmount: {
+            default: {
+              enabled: false,
+            },
+            overrides: {
+              musdConversion: {
+                enabled: false,
+              },
+            },
+          },
+        },
+      },
+      {
+        thresholdName: 'treatment',
+        thresholdVersion: 2,
+        value: {
+          prefilledAmount: {
+            default: {
+              enabled: false,
+            },
+            overrides: {
+              musdConversion: {
+                enabled: false,
+              },
+            },
+          },
+          payStrategies: {
+            relay: {
+              gaslessEnabled: true,
+            },
+          },
+        },
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  confirmations_pay_hardware: {
+    name: 'confirmations_pay_hardware',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  confirmations_pay_post_quote: {
+    name: 'confirmations_pay_post_quote',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.38.0': {
+          default: {
+            enabled: false,
+            tokens: {},
+          },
+          overrides: {
+            perpsWithdraw: {
+              hyperliquidActivationFee: {
+                enabled: true,
+              },
+              tokens: {
+                '0xe708': [
+                  '0x0000000000000000000000000000000000000000',
+                  '0xacA92E438df0B2401fF60dA7E4337B687a2435DA',
+                ],
+                '0x1': [
+                  '0x0000000000000000000000000000000000000000',
+                  '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+                  '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+                  '0xacA92E438df0B2401fF60dA7E4337B687a2435DA',
+                  '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+                ],
+                '0x2105': [
+                  '0x0000000000000000000000000000000000000000',
+                  '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+                ],
+                '0x38': [
+                  '0x0000000000000000000000000000000000000000',
+                  '0x55d398326f99059fF775485246999027B3197955',
+                  '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+                ],
+                '0x89': [
+                  '0x0000000000000000000000000000000000001010',
+                  '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+                  '0xc2132d05d31c914a87c6611c10748aeb04b58e8f',
+                ],
+                '0xa4b1': [
+                  '0x0000000000000000000000000000000000000000',
+                  '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+                  '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
+                ],
+              },
+              enabled: false,
+            },
+          },
+        },
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  confirmations_pay_tokens: {
+    name: 'confirmations_pay_tokens',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  corePlatformRpcFailoverForceEnabled: {
+    name: 'corePlatformRpcFailoverForceEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: false,
+    status: FeatureFlagStatus.Active,
+  },
+
+  corePlatformRpcFailoverMode: {
+    name: 'corePlatformRpcFailoverMode',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: 'enabled',
+    status: FeatureFlagStatus.Active,
+  },
+
+  coreExtensionUxCeux1024AbtestReferralUi: {
+    name: 'coreExtensionUxCeux1024AbtestReferralUi',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [],
+    status: FeatureFlagStatus.Active,
+  },
+
+  coreExtensionUxCeux1096AbtestReferralUi: {
+    name: 'coreExtensionUxCeux1096AbtestReferralUi',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        scope: {
+          type: 'threshold',
+          value: 0.5,
+        },
+        name: 'control',
+      },
+      {
+        name: 'treatment',
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  coreExtensionUxCeux1141AbtestBottomNav: {
+    name: 'coreExtensionUxCeux1141AbtestBottomNav',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [],
+    status: FeatureFlagStatus.Active,
+  },
+
+  defiControllerV2: {
+    name: 'defiControllerV2',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.41.0': {
+          enabled: true,
+        },
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  earnCONF1385AbtestPrefilledMaxAmount: {
+    name: 'earnCONF1385AbtestPrefilledMaxAmount',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  enabledAdvancedPermissions: {
+    name: 'enabledAdvancedPermissions',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      permissions: [
+        'native-token-stream',
+        'native-token-periodic',
+        'native-token-allowance',
+        'erc20-token-stream',
+        'erc20-token-periodic',
+        'erc20-token-allowance',
+        'token-approval-revocation',
+      ],
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxActiveDomainMetrics: {
+    name: 'extensionUxActiveDomainMetrics',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      minimumVersion: '13.36.0',
+      value: ['x.com', 'twitter.com'],
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxActivityListRedesign: {
+    name: 'extensionUxActivityListRedesign',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+      minimumVersion: '13.36.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxNetworkManagement: {
+    name: 'extensionUxNetworkManagement',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+      minimumVersion: '13.38.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxTokenManagementFilter: {
+    name: 'extensionUxTokenManagementFilter',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+      minimumVersion: '13.33.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionBasicFunctionalityToggle: {
+    name: 'extensionBasicFunctionalityToggle',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+      minimumVersion: '13.38.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionTransactionLabels: {
+    name: 'extensionTransactionLabels',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: false,
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxChainlist: {
+    name: 'extensionUxChainlist',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      minimumVersion: '13.38.0',
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxTransactionEventToast: {
+    name: 'extensionUxTransactionEventToast',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+      minimumVersion: '13.36.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  ledgerDmk: {
+    name: 'ledgerDmk',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+      featureVersion: null,
+      minimumVersion: null,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  networkAssetsSnapsMigrationSolana: {
+    name: 'networkAssetsSnapsMigrationSolana',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.41.0': {
+          stage: 0,
+          featureVersion: '1',
+          minimumSnapVersion: '2.9.0',
+        },
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  networkAssetsSnapsMigrationStellar: {
+    name: 'networkAssetsSnapsMigrationStellar',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.41.0': {
+          featureVersion: '1',
+          minimumSnapVersion: '1.20.0',
+          stage: 0,
+        },
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  networkAssetsSnapsMigrationTron: {
+    name: 'networkAssetsSnapsMigrationTron',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.41.0': {
+          minimumSnapVersion: '1.20.0',
+          stage: 0,
+          featureVersion: '1',
+        },
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  perpsSlippageConfig2: {
+    name: 'perpsSlippageConfig2',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+      minimumVersion: '13.30.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  perpsOrderBookEnabled: {
+    name: 'perpsOrderBookEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      minimumVersion: '13.0.0',
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  perpsShowFullAssetNames: {
+    name: 'perpsShowFullAssetNames',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      minimumVersion: '13.40.0',
+      enabled: true,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  perpsTAT3382AbtestTabBadge: {
+    name: 'perpsTAT3382AbtestTabBadge',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {
+        '13.39.0': [
+          {
+            scope: {
+              value: 1,
+              type: 'threshold',
+            },
+            name: 'control',
+          },
+          {
+            scope: {
+              type: 'threshold',
+              value: 1,
+            },
+            name: 'treatment',
+          },
+        ],
+      },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  perpsTerminalBackendEnabled: {
+    name: 'perpsTerminalBackendEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: true,
+      minimumVersion: '13.40.0',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  platformPersistenceSuspendWritesOnShutdown: {
+    name: 'platformPersistenceSuspendWritesOnShutdown',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        thresholdVersion: 2,
+        value: {
+          minimumVersion: '13.41.0',
+          enabled: true,
+        },
+        scope: {
+          value: 0,
+          type: 'threshold',
+        },
+        thresholdName: 'enabled — 0% rollout',
+      },
+      {
+        thresholdVersion: 2,
+        value: {
+          enabled: false,
+          minimumVersion: '0.0.0',
+        },
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+        thresholdName: 'disabled — remaining 100%',
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  productSafetyScamQuestionnaireEnabled: {
+    name: 'productSafetyScamQuestionnaireEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [],
+    status: FeatureFlagStatus.Active,
+  },
+
+  rampsEnabled: {
+    name: 'rampsEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  rampsServiceDisruption: {
+    name: 'rampsServiceDisruption',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: false,
+    status: FeatureFlagStatus.Active,
+  },
+
+  smartTransactionsAllowedRpcHosts: {
+    name: 'smartTransactionsAllowedRpcHosts',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      '.infura.io',
+      '.binance.org',
+      'mainnet.base.org',
+      'rpc.linea.build',
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stableTokens: {
+    name: 'stableTokens',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  stellarAssetEnrichment: {
+    name: 'stellarAssetEnrichment',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+      minimumVersion: '0.0.1',
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationBatchStatus: {
+    name: 'stxMigrationBatchStatus',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        value: true,
+        name: 'sentinel on',
+        scope: {
+          value: 1,
+          type: 'threshold',
+        },
+      },
+      {
+        value: false,
+        name: 'sentinel off',
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationCancel: {
+    name: 'stxMigrationCancel',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'sentinel on',
+        scope: {
+          value: 1,
+          type: 'threshold',
+        },
+        value: true,
+      },
+      {
+        name: 'sentinel off',
+        scope: {
+          value: 0,
+          type: 'threshold',
+        },
+        value: false,
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationGetFees: {
+    name: 'stxMigrationGetFees',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        value: true,
+        name: 'sentinel on',
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+      },
+      {
+        value: false,
+        name: 'sentinel off',
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  stxMigrationSubmitTransactions: {
+    name: 'stxMigrationSubmitTransactions',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: [
+      {
+        name: 'sentinel on',
+        scope: {
+          type: 'threshold',
+          value: 1,
+        },
+        value: true,
+      },
+      {
+        scope: {
+          type: 'threshold',
+          value: 0,
+        },
+        value: false,
+        name: 'sentinel off',
+      },
+    ],
+    status: FeatureFlagStatus.Active,
+  },
+
+  vipProgramEnabled: {
+    name: 'vipProgramEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      minimumVersion: '13.36.0',
+      enabled: true,
+    },
     status: FeatureFlagStatus.Active,
   },
 };
